@@ -79,3 +79,10 @@ async def verify_request_endpoint(
 async def logout_endpoint(response: Response) -> dict:
     response.delete_cookie("access_token")
     return {"message": "Logged out"}
+
+
+@router.get("/me")
+async def me_endpoint(
+    user: User = Depends(require_authenticated),
+) -> dict:
+    return {"id": user.id, "email": user.email, "role": user.role.value}
