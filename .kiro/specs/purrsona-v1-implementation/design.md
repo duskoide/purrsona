@@ -2,7 +2,7 @@
 
 ## Overview
 
-Purrsona v1 is a community cat tracker comprising a Next.js frontend, FastAPI backend, PostgreSQL database with pgvector, S3-compatible image storage, and CLIP-based visual similarity search. The system supports public browsing, authenticated contributions, and role-gated welfare updates through a three-tier access model.
+Purrsona v1 is a community cat tracker comprising a Next.js frontend, FastAPI backend, PostgreSQL database with pgvector, S3-compatible image storage, and a two-stage cat matching pipeline (metadata filtering + MegaDescriptor fur pattern embeddings). The system supports public browsing, authenticated contributions, and role-gated welfare updates through a three-tier access model.
 
 ## Architecture
 
@@ -33,11 +33,11 @@ Purrsona v1 is a community cat tracker comprising a Next.js frontend, FastAPI ba
 └─────────┼────────────┼────────────┼────────────┼───────────────────┘
           │            │            │            │
           ▼            ▼            ▼            ▼
-┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐
-│  PostgreSQL  │ │  Image   │ │  CLIP    │ │  Auth Provider   │
-│  + pgvector  │ │  Store   │ │  Model   │ │  (JWT issuer)    │
-│              │ │  (S3)    │ │  Service │ │                  │
-└──────────────┘ └──────────┘ └──────────┘ └──────────────────┘
+┌──────────────┐ ┌──────────┐ ┌───────────────┐ ┌──────────────────┐
+│  PostgreSQL  │ │  Image   │ │ MegaDescriptor│ │  Auth Provider   │
+│  + pgvector  │ │  Store   │ │    Model      │ │  (JWT issuer)    │
+│              │ │  (S3)    │ │   Service     │ │                  │
+└──────────────┘ └──────────┘ └───────────────┘ └──────────────────┘
 ```
 
 ### Component Breakdown
@@ -48,7 +48,8 @@ Purrsona v1 is a community cat tracker comprising a Next.js frontend, FastAPI ba
 | Backend API | Python 3.11+, FastAPI, Pydantic | REST API, business logic, auth, validation |
 | Database | PostgreSQL 16 + pgvector | Relational data, embedding vectors, spatial data |
 | Image Store | MinIO (dev) / S3 (prod) | Photo storage, public URL serving |
-| Embedding Service | CLIP (ViT-B/32), in-process | Embedding generation, similarity search |
+| Metadata Filter | SQL-based pre-filter | Narrows candidate set by coat color, pattern, ear tip, body size |
+| Embedding Service | MegaDescriptor (ViT-B/14), in-process | 768-dim fur pattern embedding generation, cosine similarity search |
 | Auth | JWT-based, role claims | Authentication, authorization |
 
 ### Request Flow: Sighting Submission
@@ -57,7 +58,10 @@ Purrsona v1 is a community cat tracker comprising a Next.js frontend, FastAPI ba
 User → Frontend → POST /api/v1/sightings/initiate
                      │
                      ├─ Upload photo → Image Store → reference URL
-                     ├─ Generate CLIP embedding → pgvector cosine search
+                     ├─ Stage 1: Metadata Filter (coat_color, pattern_type,
+                     │           ear_tip_status, body_size) → candidate subset
+                     ├─ Stage 2: Generate MegaDescriptor embedding (768-dim)
+                     │           → pgvector cosine search on filtered subset
                      ├─ Return top-3 Match_Candidates
                      │
 User ← Frontend ← Match candidates + "none of these"
@@ -81,16 +85,18 @@ User → Frontend → POST /api/v1/sightings/confirm
 │ email        │       │ name             │       │ cat_profile_id   │──→
 │ role (enum)  │       │ photos (JSONB)   │       │ user_id (FK)     │
 │ created_at   │       │ tnr_status(enum) │       │ photo_url        │
-│ verified_at  │       │ embedding(vector)│       │ location (point) │
-└──────────────┘       │ created_at       │       │ blurred_location │
-       │               │ created_by (FK)  │       │ timestamp        │
-       │               └──────────────────┘       │ condition_tags   │
-       │                        │                 │ notes (nullable) │
-       │                        │                 │ created_at       │
-       ▼                        ▼                 └──────────────────┘
-┌──────────────────┐   ┌──────────────────┐
-│  feeding_spots   │   │   tnr_records    │
-├──────────────────┤   ├──────────────────┤
+│ verified_at  │       │ coat_color(enum) │       │ location (point) │
+└──────────────┘       │ pattern_type(enum)│      │ blurred_location │
+       │               │ notable_markings │       │ observed_at      │
+       │               │ ear_tip_status   │       │ condition_tags   │
+       │               │ body_size (enum) │       │ coat_color(enum) │
+       │               │ embedding(vec768)│       │ pattern_type(enum)│
+       │               │ created_at       │       │ notable_markings │
+       │               │ created_by (FK)  │       │ ear_tip_status   │
+       ▼               └──────────────────┘       │ body_size (enum) │
+┌──────────────────┐   ┌──────────────────┐       │ notes (nullable) │
+│  feeding_spots   │   │   tnr_records    │       │ created_at       │
+├──────────────────┤   ├──────────────────┤       └──────────────────┘
 │ id (UUID PK)     │   │ id (UUID PK)     │
 │ user_id (FK)     │   │ cat_profile_id   │
 │ location (point) │   │ user_id (FK)     │
@@ -124,6 +130,15 @@ CREATE TYPE tnr_status_enum AS ENUM (
 CREATE TYPE report_reason AS ENUM (
     'inaccurate', 'abusive', 'unsafe', 'other'
 );
+CREATE TYPE coat_color_enum AS ENUM (
+    'black', 'white', 'orange', 'gray', 'brown',
+    'cream', 'mixed_black_white', 'mixed_orange_white', 'other'
+);
+CREATE TYPE pattern_type_enum AS ENUM (
+    'tabby', 'calico', 'tuxedo', 'solid', 'bicolor',
+    'tortoiseshell', 'pointed', 'other'
+);
+CREATE TYPE body_size_enum AS ENUM ('small', 'medium', 'large');
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -139,7 +154,14 @@ CREATE TABLE cat_profiles (
     name VARCHAR(255),
     photos JSONB NOT NULL DEFAULT '[]',
     tnr_status tnr_status_enum NOT NULL DEFAULT 'unassessed',
-    embedding vector(512),
+    -- Cat_Metadata for filtering
+    coat_color coat_color_enum,
+    pattern_type pattern_type_enum,
+    notable_markings TEXT,
+    ear_tip_status BOOLEAN NOT NULL DEFAULT FALSE,
+    body_size body_size_enum,
+    -- MegaDescriptor embedding (768-dim)
+    embedding vector(768),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_by UUID REFERENCES users(id)
 );
@@ -153,6 +175,12 @@ CREATE TABLE sightings (
     blurred_location GEOMETRY(Point, 4326) NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL,
     condition_tags JSONB NOT NULL,
+    -- Cat_Metadata captured at sighting time
+    coat_color coat_color_enum,
+    pattern_type pattern_type_enum,
+    notable_markings TEXT,
+    ear_tip_status BOOLEAN,
+    body_size body_size_enum,
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -188,6 +216,10 @@ CREATE TABLE content_reports (
 -- Indexes for performance
 CREATE INDEX idx_cat_profiles_embedding ON cat_profiles
     USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX idx_cat_profiles_coat_color ON cat_profiles(coat_color);
+CREATE INDEX idx_cat_profiles_pattern_type ON cat_profiles(pattern_type);
+CREATE INDEX idx_cat_profiles_ear_tip_status ON cat_profiles(ear_tip_status);
+CREATE INDEX idx_cat_profiles_body_size ON cat_profiles(body_size);
 CREATE INDEX idx_sightings_cat_profile ON sightings(cat_profile_id);
 CREATE INDEX idx_sightings_observed_at ON sightings(observed_at DESC);
 CREATE INDEX idx_feeding_spots_location ON feeding_spots USING GIST(blurred_location);
@@ -290,7 +322,12 @@ POST /api/v1/sightings/initiate
       "longitude": -74.0060,
       "observed_at": "2024-01-15T10:30:00Z",
       "condition_tags": ["healthy", "friendly"],
-      "notes": "Spotted near the park bench"  // optional
+      "coat_color": "orange",
+      "pattern_type": "tabby",
+      "notable_markings": "white patch on chest",  // optional
+      "ear_tip_status": false,                     // optional
+      "body_size": "medium",                       // optional
+      "notes": "Spotted near the park bench"       // optional
     }
   Response 200:
     {
@@ -414,7 +451,8 @@ class ISightingService(Protocol):
     """Manages sighting lifecycle: initiation, matching, confirmation."""
     async def initiate_sighting(
         self, user_id: str, photo: UploadFile, location: Coordinate,
-        observed_at: datetime, condition_tags: list[str], notes: str | None
+        observed_at: datetime, condition_tags: list[str],
+        metadata: CatMetadata, notes: str | None
     ) -> SightingDraft: ...
 
     async def confirm_sighting(
@@ -422,11 +460,16 @@ class ISightingService(Protocol):
     ) -> ConfirmedSighting: ...
 
 class IEmbeddingService(Protocol):
-    """Generates CLIP embeddings and performs similarity search."""
+    """Generates MegaDescriptor fur pattern embeddings and performs similarity search."""
     def generate_embedding(self, image: Image.Image) -> list[float]: ...
     async def find_matches(
-        self, embedding: list[float], db_session: AsyncSession
+        self, embedding: list[float], metadata: CatMetadata,
+        metadata_filter: IMetadataFilterService, db_session: AsyncSession
     ) -> list[MatchCandidate]: ...
+
+class IMetadataFilterService(Protocol):
+    """Pre-filters candidate Cat_Profiles by structured metadata (Stage 1)."""
+    def build_filter_query(self, metadata: CatMetadata) -> tuple[str, list]: ...
 
 class IImageService(Protocol):
     """Handles image upload, validation, and storage."""
@@ -591,12 +634,13 @@ def haversine_distance(a: Coordinate, b: Coordinate) -> float:
     return 2 * R * math.asin(math.sqrt(h))
 ```
 
-### CLIP Embedding & Cat Matching
+### MegaDescriptor Embedding & Two-Stage Cat Matching
 
 ```python
 import torch
-import clip
+import timm
 from PIL import Image
+from torchvision import transforms
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -607,38 +651,124 @@ class MatchCandidate:
     photo_url: str
     similarity_score: float
 
+@dataclass
+class CatMetadata:
+    """Structured metadata for metadata-based pre-filtering."""
+    coat_color: str          # enum: black, white, orange, gray, brown, cream, mixed_black_white, mixed_orange_white, other
+    pattern_type: str        # enum: tabby, calico, tuxedo, solid, bicolor, tortoiseshell, pointed, other
+    notable_markings: Optional[str] = None   # free-text
+    ear_tip_status: Optional[bool] = None    # True if ear-tipped
+    body_size: Optional[str] = None          # enum: small, medium, large
+
+
+class MetadataFilterService:
+    """Stage 1: Pre-filters candidate Cat_Profiles by structured metadata.
+    
+    Uses SQL WHERE clauses to narrow the candidate set before the more
+    expensive embedding comparison. Only exact-match fields are used for
+    filtering (coat_color, pattern_type, ear_tip_status, body_size).
+    """
+
+    def build_filter_query(self, metadata: CatMetadata) -> tuple[str, list]:
+        """Build a SQL WHERE clause fragment from sighting metadata.
+        
+        Returns (where_clause, params) for composing into the similarity query.
+        Filters only on non-None fields. coat_color and pattern_type are required.
+        """
+        conditions = []
+        params = []
+        param_idx = 1
+
+        # Required filters (always present on sighting submission)
+        conditions.append(f"coat_color = ${param_idx}")
+        params.append(metadata.coat_color)
+        param_idx += 1
+
+        conditions.append(f"pattern_type = ${param_idx}")
+        params.append(metadata.pattern_type)
+        param_idx += 1
+
+        # Optional filters (only applied if provided)
+        if metadata.ear_tip_status is not None:
+            conditions.append(f"ear_tip_status = ${param_idx}")
+            params.append(metadata.ear_tip_status)
+            param_idx += 1
+
+        if metadata.body_size is not None:
+            conditions.append(f"body_size = ${param_idx}")
+            params.append(metadata.body_size)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions)
+        return where_clause, params
+
+
 class EmbeddingService:
+    """Stage 2: Generates MegaDescriptor embeddings and performs similarity search.
+    
+    Uses MegaDescriptor (ViT-B/14) trained specifically for animal
+    re-identification. Produces 768-dimensional fur pattern embeddings
+    optimized for distinguishing individual animals by visual appearance.
+    """
     SIMILARITY_THRESHOLD: float = 0.65
     MAX_CANDIDATES: int = 3
 
-    def __init__(self, model_name: str = "ViT-B/32"):
+    def __init__(self, model_name: str = "hf-hub:BVRA/MegaDescriptor-T-224"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model, self.preprocess = clip.load(model_name, device=self.device)
+        self.model = timm.create_model(model_name, pretrained=True)
+        self.model = self.model.to(self.device).eval()
+        
+        # Standard preprocessing for ViT-B/14 (224x224 input)
+        self.preprocess = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+        ])
 
     def generate_embedding(self, image: Image.Image) -> List[float]:
-        """Generate a 512-dimensional CLIP embedding from an image."""
+        """Generate a 768-dimensional MegaDescriptor embedding from an image."""
         preprocessed = self.preprocess(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            embedding = self.model.encode_image(preprocessed)
+            embedding = self.model(preprocessed)
             embedding = embedding / embedding.norm(dim=-1, keepdim=True)
         return embedding.cpu().numpy().flatten().tolist()
 
     async def find_matches(
-        self, embedding: List[float], db_session
+        self,
+        embedding: List[float],
+        metadata: CatMetadata,
+        metadata_filter: MetadataFilterService,
+        db_session,
     ) -> List[MatchCandidate]:
-        """Query pgvector for top-3 similar cat profiles above threshold."""
-        query = """
+        """Two-stage matching: metadata filter → cosine similarity on filtered subset.
+        
+        Stage 1: SQL WHERE clauses filter by coat_color, pattern_type,
+                 ear_tip_status, body_size to narrow candidate set.
+        Stage 2: pgvector cosine similarity on the metadata-filtered subset.
+        """
+        # Stage 1: Build metadata filter
+        where_clause, filter_params = metadata_filter.build_filter_query(metadata)
+
+        # Stage 2: Cosine similarity on filtered subset
+        embedding_param_idx = len(filter_params) + 1
+        threshold_param_idx = embedding_param_idx + 1
+        limit_param_idx = threshold_param_idx + 1
+
+        query = f"""
             SELECT id, name, photos, 
-                   1 - (embedding <=> $1::vector) AS similarity
+                   1 - (embedding <=> ${embedding_param_idx}::vector) AS similarity
             FROM cat_profiles
             WHERE embedding IS NOT NULL
-              AND 1 - (embedding <=> $1::vector) >= $2
+              AND {where_clause}
+              AND 1 - (embedding <=> ${embedding_param_idx}::vector) >= ${threshold_param_idx}
             ORDER BY similarity DESC
-            LIMIT $3
+            LIMIT ${limit_param_idx}
         """
-        rows = await db_session.fetch(
-            query, embedding, self.SIMILARITY_THRESHOLD, self.MAX_CANDIDATES
-        )
+        params = filter_params + [embedding, self.SIMILARITY_THRESHOLD, self.MAX_CANDIDATES]
+        rows = await db_session.fetch(query, *params)
         return [
             MatchCandidate(
                 cat_profile_id=str(row["id"]),
@@ -792,6 +922,11 @@ interface SightingWizardState {
   location: { lat: number; lng: number } | null;
   observedAt: string;
   conditionTags: string[];
+  coatColor: string;        // required metadata
+  patternType: string;      // required metadata
+  notableMarkings: string;  // optional metadata
+  earTipStatus: boolean | null;  // optional metadata
+  bodySize: string | null;  // optional metadata
   notes: string;
   draftId: string | null;
   matchCandidates: MatchCandidate[];
@@ -1021,7 +1156,7 @@ services:
       - S3_ACCESS_KEY=minioadmin
       - S3_SECRET_KEY=minioadmin
       - S3_BUCKET=purrsona-images
-      - CLIP_MODEL_PATH=/models/ViT-B-32.pt
+      - MEGADESCRIPTOR_MODEL=hf-hub:BVRA/MegaDescriptor-T-224
       - JWT_SECRET=dev-secret-key
       - RATE_LIMIT_PER_MINUTE=60
     depends_on: [db, minio]
@@ -1070,10 +1205,10 @@ volumes:
                  ┌────────────┼────────────┐
                  │            │            │
                  ▼            ▼            ▼
-          ┌──────────┐ ┌──────────┐ ┌──────────┐
-          │PostgreSQL│ │    S3    │ │   CLIP   │
-          │+pgvector │ │  Bucket  │ │  Model   │
-          └──────────┘ └──────────┘ └──────────┘
+          ┌──────────┐ ┌──────────┐ ┌──────────────┐
+          │PostgreSQL│ │    S3    │ │MegaDescriptor│
+          │+pgvector │ │  Bucket  │ │    Model     │
+          └──────────┘ └──────────┘ └──────────────┘
 ```
 
 ### Environment Variables (Backend)
@@ -1085,7 +1220,7 @@ volumes:
 | `S3_ACCESS_KEY` | Storage access key | Yes |
 | `S3_SECRET_KEY` | Storage secret key | Yes |
 | `S3_BUCKET` | Image storage bucket name | Yes |
-| `CLIP_MODEL_PATH` | Path to CLIP model weights | Yes |
+| `MEGADESCRIPTOR_MODEL` | MegaDescriptor model identifier (default: hf-hub:BVRA/MegaDescriptor-T-224) | Yes |
 | `JWT_SECRET` | Secret for JWT signing | Yes |
 | `JWT_EXPIRY_HOURS` | Token expiry (default: 24) | No |
 | `RATE_LIMIT_PER_MINUTE` | Rate limit for mutations (default: 60) | No |
@@ -1121,7 +1256,7 @@ volumes:
 3. **JWT security**: Short-lived tokens (24h), httpOnly cookies, role claims verified server-side on every request
 4. **Input sanitization**: All user text (notes, descriptions) sanitized before storage; no raw HTML rendering
 5. **Rate limiting**: Per-user rate limits on mutation endpoints; higher limits for read endpoints
-6. **CLIP advisory only**: Embedding scores never used for access control or automated decisions
+6. **Matching pipeline advisory only**: Embedding scores and metadata filter results never used for access control or automated decisions
 
 ## Testing Strategy
 
@@ -1135,6 +1270,7 @@ Property-based tests validate universal invariants across randomly generated inp
 - TNR status domain validation with random strings (Property 12)
 - Image format/size validation with random inputs (Property 16)
 - Match candidates ordering and count (Property 9)
+- Metadata filter query correctness (Property 23)
 - API error structure consistency (Property 17)
 - Rate limiting behavior (Property 19)
 
@@ -1155,7 +1291,8 @@ Property-based tests validate universal invariants across randomly generated inp
 ### Integration Tests
 
 - Full sighting submission flow through API with database
-- CLIP embedding generation and pgvector similarity search
+- MegaDescriptor embedding generation and pgvector similarity search
+- Metadata filter + embedding pipeline integration
 - Image upload to S3-compatible storage and URL retrieval
 - Docker Compose startup with seeded data
 - Public API responses contain only blurred coordinates
@@ -1223,9 +1360,9 @@ Property-based tests validate universal invariants across randomly generated inp
 
 ### Property 9: Match candidates bounded and ordered
 
-*For any* CLIP embedding query against the cat_profiles table, the result set SHALL contain at most 3 candidates, all with similarity scores above the configured threshold, and the candidates SHALL be ordered by descending similarity score.
+*For any* MegaDescriptor embedding query against the metadata-filtered subset of cat_profiles, the result set SHALL contain at most 3 candidates, all with similarity scores above the configured threshold, and the candidates SHALL be ordered by descending similarity score.
 
-**Validates: Requirements 5.3, 5.4**
+**Validates: Requirements 5.3, 5.4, 5.5**
 
 ### Property 10: No automatic sighting linkage
 
@@ -1301,6 +1438,18 @@ Property-based tests validate universal invariants across randomly generated inp
 
 ### Property 22: Environment-based configuration
 
-*For any* configuration value consumed by the Backend_API (database URL, storage credentials, model path, JWT secret, rate limits, thresholds), the value SHALL be read from an environment variable and SHALL NOT be hardcoded in source code.
+*For any* configuration value consumed by the Backend_API (database URL, storage credentials, model identifier, JWT secret, rate limits, thresholds), the value SHALL be read from an environment variable and SHALL NOT be hardcoded in source code.
 
 **Validates: Requirements 16.4**
+
+### Property 23: Metadata filter narrows candidate set correctly
+
+*For any* sighting submission with Cat_Metadata (coat_color, pattern_type, and optionally ear_tip_status and body_size), the Metadata_Filter SHALL return only Cat_Profiles whose stored metadata matches the provided fields exactly, and SHALL exclude all Cat_Profiles that differ on any provided field.
+
+**Validates: Requirements 5.1, 12.5**
+
+### Property 24: New cat profile stores metadata for future filtering
+
+*For any* newly created Cat_Profile (via "none of these" selection), the Cat_Profile record SHALL contain the coat_color, pattern_type, notable_markings, ear_tip_status, and body_size values from the originating sighting, enabling future metadata-based pre-filtering.
+
+**Validates: Requirements 6.2, 6.4**

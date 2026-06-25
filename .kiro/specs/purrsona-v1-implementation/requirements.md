@@ -2,17 +2,18 @@
 
 ## Introduction
 
-Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat profiles, welfare mapping, and TNR coordination for stray and community cats. The system comprises a Next.js (TypeScript) frontend, a FastAPI (Python) backend, PostgreSQL with pgvector for embedding-based cat matching, S3-compatible image storage, and CLIP-based visual similarity search. The platform supports three access tiers (public, signed-in, verified), a publish-first moderation model with user reporting, and a live public map with blurred coordinates.
+Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat profiles, welfare mapping, and TNR coordination for stray and community cats. The system comprises a Next.js (TypeScript) frontend, a FastAPI (Python) backend, PostgreSQL with pgvector for embedding-based cat matching, S3-compatible image storage, and a two-stage matching pipeline using metadata filtering and MegaDescriptor fur pattern embeddings. The platform supports three access tiers (public, signed-in, verified), a publish-first moderation model with user reporting, and a live public map with blurred coordinates.
 
 ## Glossary
 
-- **Purrsona_System**: The full-stack application comprising the Next.js frontend, FastAPI backend, PostgreSQL database, image storage service, and CLIP embedding pipeline
+- **Purrsona_System**: The full-stack application comprising the Next.js frontend, FastAPI backend, PostgreSQL database, image storage service, and MegaDescriptor embedding pipeline
 - **Frontend**: The Next.js (React, TypeScript) client application served to users
 - **Backend_API**: The FastAPI (Python) service handling business logic, authentication, and data persistence
-- **Embedding_Service**: The subsystem that generates CLIP embeddings from cat photos and performs cosine similarity search via pgvector
+- **Embedding_Service**: The subsystem that generates MegaDescriptor fur pattern embeddings (768-dimensional vectors) from cat photos and performs cosine similarity search via pgvector
+- **Metadata_Filter**: The subsystem that compares structured cat metadata (coat color, pattern type, notable markings, ear tip status, body size) to pre-filter candidate Cat_Profiles before embedding comparison
 - **Image_Store**: The S3-compatible object storage service for cat photos and sighting images
-- **Cat_Profile**: A persistent record representing a likely individual community or stray cat, containing alias, photos, sighting history, status tags, feeding notes, and TNR status
-- **Sighting**: A user-submitted observation of a cat including a photo, map location, timestamp, and at least one structured condition tag
+- **Cat_Profile**: A persistent record representing a likely individual community or stray cat, containing alias, photos, sighting history, status tags, feeding notes, TNR status, Cat_Metadata, and a MegaDescriptor fur pattern embedding
+- **Sighting**: A user-submitted observation of a cat including a photo, map location, timestamp, at least one structured condition tag, and Cat_Metadata describing the observed cat
 - **Feeding_Spot**: A map-based record for a known feeding location created by a signed-in user
 - **TNR_Record**: A user-created post or record related to Trap-Neuter-Return activity for a cat
 - **TNR_Status**: The current public welfare status on a Cat_Profile, restricted to one of six defined values
@@ -20,7 +21,8 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 - **Signed_In_User**: An authenticated community user who can submit sightings, create feeding spots, create TNR records, and report content
 - **Verified_User**: A verified caretaker or TNR volunteer who has all Signed_In_User permissions plus the ability to update TNR_Status on existing Cat_Profiles
 - **Live_Map**: The public-facing interactive map displaying sightings, feeding spots, and TNR information with blurred coordinates
-- **Match_Candidates**: Up to 3 existing Cat_Profiles returned by the Embedding_Service ranked by cosine similarity confidence
+- **Cat_Metadata**: Structured descriptive attributes of a cat including coat color, pattern type (tabby, calico, tuxedo, solid, bicolor, tortoiseshell, pointed, other), notable markings, ear tip status, and body size (small, medium, large)
+- **Match_Candidates**: Up to 3 existing Cat_Profiles returned by the two-stage matching pipeline (metadata filtering followed by MegaDescriptor embedding ranking) ordered by cosine similarity confidence
 - **Design_System**: The foundational visual design tokens, component library specifications, and UI patterns guiding frontend implementation
 
 ## Requirements
@@ -66,27 +68,29 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 
 #### Acceptance Criteria
 
-1. WHEN a Signed_In_User submits a sighting, THE Backend_API SHALL require a photo, map location, timestamp, and at least one structured condition tag
-2. THE Backend_API SHALL accept optional free-text notes on a sighting submission
-3. WHEN a sighting photo is uploaded, THE Image_Store SHALL store the image and return a permanent reference URL
-4. THE Backend_API SHALL store each confirmed sighting as an immutable historical record
-5. THE Backend_API SHALL associate each sighting with exactly one Cat_Profile before marking submission as complete
-6. WHEN a sighting submission is missing any required field, THE Backend_API SHALL return an HTTP 422 response specifying the missing fields
+1. WHEN a Signed_In_User submits a sighting, THE Backend_API SHALL require a photo, map location, timestamp, at least one structured condition tag, and Cat_Metadata fields (coat color and pattern type)
+2. THE Backend_API SHALL accept optional Cat_Metadata fields (notable markings, ear tip status, body size) on a sighting submission
+3. THE Backend_API SHALL accept optional free-text notes on a sighting submission
+4. WHEN a sighting photo is uploaded, THE Image_Store SHALL store the image and return a permanent reference URL
+5. THE Backend_API SHALL store each confirmed sighting as an immutable historical record
+6. THE Backend_API SHALL associate each sighting with exactly one Cat_Profile before marking submission as complete
+7. WHEN a sighting submission is missing any required field, THE Backend_API SHALL return an HTTP 422 response specifying the missing fields
 
-### Requirement 5: Cat Matching via CLIP Embeddings
+### Requirement 5: Cat Matching via Two-Stage Pipeline (Metadata + MegaDescriptor)
 
-**User Story:** As a Signed_In_User, I want the system to suggest possible cat matches for my sighting photo, so that I can link my observation to existing cat profiles efficiently.
+**User Story:** As a Signed_In_User, I want the system to suggest possible cat matches for my sighting photo and metadata, so that I can link my observation to existing cat profiles efficiently.
 
 #### Acceptance Criteria
 
-1. WHEN a sighting photo is submitted, THE Embedding_Service SHALL generate a CLIP embedding vector from the photo
-2. THE Embedding_Service SHALL query pgvector using cosine similarity against stored Cat_Profile embeddings
-3. THE Embedding_Service SHALL return at most 3 Match_Candidates ranked by descending cosine similarity score
-4. WHEN fewer than 3 Cat_Profiles exist with similarity above a configured threshold, THE Embedding_Service SHALL return only those candidates that meet the threshold
-5. THE Frontend SHALL present Match_Candidates to the user alongside a "none of these" option
-6. WHEN the user selects "none of these," THE Backend_API SHALL create a new Cat_Profile and associate the sighting with the new profile
-7. WHEN the user confirms a Match_Candidate, THE Backend_API SHALL associate the sighting with the selected Cat_Profile
-8. THE Purrsona_System SHALL treat all Embedding_Service output as advisory and SHALL NOT automatically link sightings without explicit user confirmation
+1. WHEN a sighting is submitted with Cat_Metadata, THE Metadata_Filter SHALL filter candidate Cat_Profiles by matching coat color, pattern type, ear tip status, and body size against stored Cat_Profile metadata
+2. WHEN a sighting photo is submitted, THE Embedding_Service SHALL generate a 768-dimensional MegaDescriptor fur pattern embedding vector from the photo
+3. THE Embedding_Service SHALL query pgvector using cosine similarity against stored Cat_Profile embeddings, restricted to the candidate set produced by the Metadata_Filter
+4. THE Embedding_Service SHALL return at most 3 Match_Candidates ranked by descending cosine similarity score
+5. WHEN fewer than 3 Cat_Profiles exist with similarity above a configured threshold within the metadata-filtered candidate set, THE Embedding_Service SHALL return only those candidates that meet the threshold
+6. THE Frontend SHALL present Match_Candidates to the user alongside a "none of these" option
+7. WHEN the user selects "none of these," THE Backend_API SHALL create a new Cat_Profile and associate the sighting with the new profile
+8. WHEN the user confirms a Match_Candidate, THE Backend_API SHALL associate the sighting with the selected Cat_Profile
+9. THE Purrsona_System SHALL treat all Embedding_Service and Metadata_Filter output as advisory and SHALL NOT automatically link sightings without explicit user confirmation
 
 ### Requirement 6: Cat Profile Creation
 
@@ -95,9 +99,10 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 #### Acceptance Criteria
 
 1. WHEN a Signed_In_User selects "none of these" during sighting submission, THE Backend_API SHALL create a new Cat_Profile
-2. THE Backend_API SHALL initialize the new Cat_Profile with the sighting photo, location, timestamp, and structured tags from the originating sighting
-3. THE Embedding_Service SHALL generate and store a CLIP embedding for the new Cat_Profile to enable future matching
-4. THE Backend_API SHALL link the originating sighting as the first entry in the new Cat_Profile sighting history
+2. THE Backend_API SHALL initialize the new Cat_Profile with the sighting photo, location, timestamp, structured tags, and Cat_Metadata (coat color, pattern type, notable markings, ear tip status, body size) from the originating sighting
+3. THE Embedding_Service SHALL generate and store a 768-dimensional MegaDescriptor fur pattern embedding for the new Cat_Profile to enable future matching
+4. THE Backend_API SHALL store the Cat_Metadata on the new Cat_Profile to enable future metadata filtering
+5. THE Backend_API SHALL link the originating sighting as the first entry in the new Cat_Profile sighting history
 
 ### Requirement 7: Feeding Spot Management
 
@@ -157,14 +162,15 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 
 ### Requirement 12: Database and Embedding Storage
 
-**User Story:** As the development team, I want cat embeddings stored in pgvector alongside relational data, so that similarity search is fast and co-located with application data.
+**User Story:** As the development team, I want cat embeddings and metadata stored in pgvector alongside relational data, so that the two-stage matching pipeline is fast and co-located with application data.
 
 #### Acceptance Criteria
 
-1. THE Backend_API SHALL store CLIP embedding vectors in PostgreSQL using the pgvector extension
+1. THE Backend_API SHALL store 768-dimensional MegaDescriptor fur pattern embedding vectors in PostgreSQL using the pgvector extension
 2. THE Embedding_Service SHALL use cosine similarity as the distance metric for cat matching queries
 3. THE Backend_API SHALL store exact geographic coordinates in PostgreSQL for all location-bearing entities
 4. THE Backend_API SHALL index embedding vectors to support sub-second similarity search across the Cat_Profile corpus
+5. THE Backend_API SHALL store Cat_Metadata (coat color, pattern type, notable markings, ear tip status, body size) as structured columns on the Cat_Profile record to support metadata-based pre-filtering
 
 ### Requirement 13: API Architecture
 
