@@ -14,11 +14,15 @@ from app.core.error_handlers import (
 )
 from app.core.rate_limit import RateLimitMiddleware
 from app.db.pool import init_db_pool, close_db_pool
+from app.api.auth import router as auth_router
+from app.api.admin import router as admin_router
+from app.services.auth_service import bootstrap_admin
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    await init_db_pool()
+    pool = await init_db_pool()
+    await bootstrap_admin(pool, settings.BOOTSTRAP_ADMIN_EMAIL)
     yield
     await close_db_pool()
 
@@ -42,6 +46,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(auth_router)
+app.include_router(admin_router)
 
 
 @app.get("/health")
