@@ -26,14 +26,18 @@ services:
       - JWT_SECRET=dev-secret-key
       - BOOTSTRAP_ADMIN_EMAIL=admin@purrsona.local
     depends_on:
-      - db
-      - minio
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations
 
   db:
-    image: postgis/postgis:16-3.4
+    build:
+      context: ./backend
+      dockerfile: db.Dockerfile
     ports:
       - "5432:5432"
     environment:
