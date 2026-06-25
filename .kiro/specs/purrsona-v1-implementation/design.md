@@ -107,105 +107,153 @@ Verified User → PATCH /api/v1/admin/verification-requests/{id}
 
 ### Entity-Relationship Diagram
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                            ENTITY RELATIONSHIPS                                   │
-│                                                                                  │
-│  users (1) ──────< (N) sightings           "a user submits many sightings"      │
-│  users (1) ──────< (N) feeding_spots       "a user creates many feeding spots"  │
-│  users (1) ──────< (N) tnr_records         "a user creates many TNR records"    │
-│  users (1) ──────< (N) content_reports     "a user files many reports"          │
-│  users (1) ──────< (N) cat_profiles        "a user creates many cat profiles"   │
-│  users (1) ──────< (N) sighting_drafts     "a user has many pending drafts"     │
-│  users (1) ──────< (N) verification_requests "a user submits verif. requests"   │
-│  users (1) ──────< (N) verification_requests.reviewed_by "a reviewer reviews"   │
-│                                                                                  │
-│  cat_profiles (1) ──< (N) sightings        "a cat has many sightings"           │
-│  cat_profiles (1) ──< (N) tnr_records      "a cat has many TNR records"         │
-│                                                                                  │
-│  sighting_drafts are temporary (30-min TTL), not linked to cat_profiles yet      │
-│  content_reports use polymorphic reference (content_type + content_id)            │
-└──────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    users ||--o{ cat_profiles : "creates"
+    users ||--o{ sightings : "submits"
+    users ||--o{ feeding_spots : "creates"
+    users ||--o{ tnr_records : "creates"
+    users ||--o{ content_reports : "reports"
+    users ||--o{ sighting_drafts : "owns"
+    users ||--o{ verification_requests : "requests"
+    users ||--o{ verification_requests : "reviews"
+    cat_profiles ||--o{ sightings : "has"
+    cat_profiles ||--o{ tnr_records : "has"
+
+    users {
+        UUID id PK
+        VARCHAR email UK
+        user_role role
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ verified_at
+    }
+    cat_profiles {
+        UUID id PK
+        VARCHAR name
+        JSONB photos
+        tnr_status_enum tnr_status
+        coat_color_enum coat_color
+        pattern_type_enum pattern_type
+        TEXT notable_markings
+        BOOLEAN ear_tip_status
+        body_size_enum body_size
+        vector768 embedding
+        TIMESTAMPTZ created_at
+        UUID created_by FK
+    }
+    sightings {
+        UUID id PK
+        UUID cat_profile_id FK
+        UUID user_id FK
+        VARCHAR photo_url
+        GEOMETRY location
+        GEOMETRY blurred_location
+        TIMESTAMPTZ observed_at
+        JSONB condition_tags
+        coat_color_enum coat_color
+        pattern_type_enum pattern_type
+        TEXT notable_markings
+        BOOLEAN ear_tip_status
+        body_size_enum body_size
+        TEXT notes
+        TIMESTAMPTZ created_at
+    }
+    feeding_spots {
+        UUID id PK
+        UUID user_id FK
+        GEOMETRY location
+        GEOMETRY blurred_location
+        JSONB details
+        TIMESTAMPTZ created_at
+    }
+    tnr_records {
+        UUID id PK
+        UUID cat_profile_id FK
+        UUID user_id FK
+        TEXT content
+        tnr_status_enum status_change
+        TIMESTAMPTZ created_at
+    }
+    sighting_drafts {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR photo_url
+        GEOMETRY location
+        GEOMETRY blurred_location
+        TIMESTAMPTZ observed_at
+        JSONB condition_tags
+        coat_color_enum coat_color
+        pattern_type_enum pattern_type
+        TEXT notable_markings
+        BOOLEAN ear_tip_status
+        body_size_enum body_size
+        TEXT notes
+        vector768 embedding
+        JSONB match_candidates
+        TIMESTAMPTZ draft_expires_at
+        TIMESTAMPTZ created_at
+    }
+    verification_requests {
+        UUID id PK
+        UUID user_id FK
+        TEXT evidence
+        VARCHAR status
+        UUID reviewed_by FK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ reviewed_at
+    }
+    content_reports {
+        UUID id PK
+        UUID reporter_id FK
+        VARCHAR content_type
+        UUID content_id
+        report_reason reason
+        TEXT details
+        TIMESTAMPTZ created_at
+    }
 ```
 
-```
-┌──────────────┐         ┌──────────────────┐         ┌──────────────────┐
-│    users     │         │   cat_profiles   │         │    sightings     │
-├──────────────┤         ├──────────────────┤         ├──────────────────┤
-│ id (UUID PK) │◄─┐      │ id (UUID PK)     │◄─┐      │ id (UUID PK)     │
-│ email        │  │      │ name             │  │      │ cat_profile_id(FK)│───┐
-│ role (enum)  │  │      │ photos (JSONB)   │  │      │ user_id (FK)     │─┐ │
-│ created_at   │  │      │ tnr_status(enum) │  │      │ photo_url        │ │ │
-│ verified_at  │  │      │ coat_color(enum) │  │      │ location (point) │ │ │
-└──────────────┘  │      │ pattern_type(enum)│  │      │ blurred_location │ │ │
-                  │      │ notable_markings │  │      │ observed_at      │ │ │
-   ┌──────────────┤      │ ear_tip_status   │  │      │ condition_tags   │ │ │
-   │              │      │ body_size (enum) │  │      │ coat_color(enum) │ │ │
-   │   users.id   │      │ embedding(vec768)│  │      │ pattern_type(enum)│ │ │
-   │   is FK'd by:│      │ created_at       │  │      │ notable_markings │ │ │
-   │              │      │ created_by (FK)  │──┘      │ ear_tip_status   │ │ │
-   │              │      └──────────────────┘         │ body_size (enum) │ │ │
-   │              │                                   │ notes (nullable) │ │ │
-   │              │                                   │ created_at       │ │ │
-   │              │                                   └──────────────────┘ │ │
-   │              │                                                        │ │
-   │              │  ┌──────────────────┐    ┌──────────────────┐          │ │
-   │              │  │  feeding_spots   │    │   tnr_records    │          │ │
-   │              │  ├──────────────────┤    ├──────────────────┤          │ │
-   │              ├──│ user_id (FK)     │    │ cat_profile_id(FK)│─────────┘ │
-   │              │  │ id (UUID PK)     │    │ user_id (FK)     │────────┘   │
-   │              │  │ location (point) │    │ id (UUID PK)     │            │
-   │              │  │ blurred_location │    │ content (text)   │            │
-   │              │  │ details (JSONB)  │    │ status_change    │            │
-   │              │  │ created_at       │    │ created_at       │            │
-   │              │  └──────────────────┘    └──────────────────┘            │
-   │              │                                                          │
-   │              │  ┌──────────────────┐    ┌─────────────────────────┐     │
-   │              │  │ content_reports  │    │  sighting_drafts        │     │
-   │              │  ├──────────────────┤    ├─────────────────────────┤     │
-   │              ├──│ reporter_id (FK) │    │ id (UUID PK)            │     │
-   │              │  │ id (UUID PK)     │    │ user_id (FK)            │─────┘
-   │              │  │ content_type     │    │ photo_url               │
-   │              │  │ content_id (UUID)│    │ location (point)        │
-   │              │  │ reason (enum)    │    │ blurred_location        │
-   │              │  │ created_at       │    │ observed_at             │
-   │              │  └──────────────────┘    │ condition_tags          │
-   │              │                          │ coat_color (enum)       │
-   │              │  ┌─────────────────────┐ │ pattern_type (enum)     │
-   │              │  │verification_requests│ │ notable_markings        │
-   │              │  ├─────────────────────┤ │ ear_tip_status          │
-   │              ├──│ user_id (FK)        │ │ body_size (enum)        │
-   │              └──│ reviewed_by (FK)    │ │ notes                   │
-   │                 │ id (UUID PK)        │ │ embedding (vec768)      │
-   │                 │ evidence (text)     │ │ match_candidates (JSONB)│
-   │                 │ status (enum)       │ │ draft_expires_at        │
-   │                 │ created_at          │ │ created_at              │
-   │                 │ reviewed_at         │ └─────────────────────────┘
-   │                 └─────────────────────┘
-   │
-   │  Legend:
-   │    (FK) ──→  = foreign key reference
-   │    ◄─┐       = referenced by (target of FK)
-   │    (1) ──< (N) = one-to-many relationship
-   └───────────────────────────────────────────
-```
+### Relationship Summary
 
-### Entity Relationships (plain text)
+| Parent | Child | FK Column | Cardinality | Notes |
+|--------|-------|-----------|-------------|-------|
+| users | cat_profiles | created_by | 1:N | User who first created the profile |
+| users | sightings | user_id | 1:N | User who submitted the sighting |
+| users | feeding_spots | user_id | 1:N | User who created the feeding spot |
+| users | tnr_records | user_id | 1:N | User who created the TNR record |
+| users | content_reports | reporter_id | 1:N | User who filed the report |
+| users | sighting_drafts | user_id | 1:N | User who initiated the draft (temporary, 30-min TTL) |
+| users | verification_requests | user_id | 1:N | User requesting role elevation |
+| users | verification_requests | reviewed_by | 1:N | Verified user who approved/rejected the request |
+| cat_profiles | sightings | cat_profile_id | 1:N | Confirmed sightings linked to a cat |
+| cat_profiles | tnr_records | cat_profile_id | 1:N | TNR activity records for a cat |
+| (polymorphic) | content_reports | content_type + content_id | N:1 | Report can reference sighting, feeding_spot, tnr_record, or cat_profile |
 
-| Relationship | Type | Description |
-|---|---|---|
-| users → cat_profiles | One-to-Many | A user creates many cat profiles (`cat_profiles.created_by` → `users.id`) |
-| users → sightings | One-to-Many | A user submits many sightings (`sightings.user_id` → `users.id`) |
-| users → feeding_spots | One-to-Many | A user creates many feeding spots (`feeding_spots.user_id` → `users.id`) |
-| users → tnr_records | One-to-Many | A user creates many TNR records (`tnr_records.user_id` → `users.id`) |
-| users → content_reports | One-to-Many | A user files many reports (`content_reports.reporter_id` → `users.id`) |
-| users → sighting_drafts | One-to-Many | A user has many pending drafts (`sighting_drafts.user_id` → `users.id`) |
-| users → verification_requests | One-to-Many | A user submits verification requests (`verification_requests.user_id` → `users.id`) |
-| users → verification_requests (reviewer) | One-to-Many | A reviewer reviews many requests (`verification_requests.reviewed_by` → `users.id`) |
-| cat_profiles → sightings | One-to-Many | A cat profile accumulates many confirmed sightings (`sightings.cat_profile_id` → `cat_profiles.id`) |
-| cat_profiles → tnr_records | One-to-Many | A cat profile has many TNR records (`tnr_records.cat_profile_id` → `cat_profiles.id`) |
-| content_reports → (polymorphic) | Many-to-One | A report references one piece of content via `content_type` + `content_id` (can point to any entity) |
-| sighting_drafts | Temporary | Not linked to cat_profiles — drafts expire after 30 minutes and are deleted on confirmation or expiry |
+**Notes:**
+- `sighting_drafts` are ephemeral — not FK'd to cat_profiles. They expire after 30 minutes and are deleted on confirmation or cleanup.
+- `content_reports` use a polymorphic pattern: `content_type` (string) + `content_id` (UUID) can point to any entity table.
+
+### Relationships in Plain Language
+
+**users → cat_profiles:** A user creates cat profiles. Each cat profile has one creator (`created_by`). A user can create many profiles.
+
+**users → sightings:** A user submits sightings. Each sighting belongs to one user (`user_id`). A user can submit many sightings.
+
+**users → feeding_spots:** A user creates feeding spots. Each spot belongs to one user. A user can create many spots.
+
+**users → tnr_records:** A user creates TNR records. Each record belongs to one user. A user can create many records.
+
+**users → content_reports:** A user files reports. Each report has one reporter (`reporter_id`). A user can file many reports.
+
+**users → sighting_drafts:** A user initiates sighting drafts. Drafts are temporary (30-min lifetime). Each draft belongs to one user. A user can have multiple active drafts.
+
+**users → verification_requests:** A user can request role elevation. Each request has one requesting user (`user_id`) and optionally one reviewer (`reviewed_by`). Both are FK references to users.
+
+**cat_profiles → sightings:** A cat profile collects sightings over time. Each confirmed sighting links to exactly one cat profile (`cat_profile_id`). A profile can have many sightings.
+
+**cat_profiles → tnr_records:** A cat profile has TNR history. Each TNR record links to one cat profile. A profile can have many TNR records.
+
+**content_reports → (any entity):** Reports use a polymorphic reference — `content_type` identifies the table (sighting, feeding_spot, tnr_record, cat_profile) and `content_id` is the UUID of the reported record. There is no enforced FK constraint at the database level for this relationship.
 
 ### Database Schema (PostgreSQL + pgvector)
 
