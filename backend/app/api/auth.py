@@ -10,6 +10,8 @@ from app.services.auth_service import login, register, submit_verification_reque
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+COOKIE_SECURE = settings.ENVIRONMENT == "production"
+
 
 class RegisterRequest(BaseModel):
     email: str
@@ -37,7 +39,7 @@ async def register_endpoint(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_EXPIRY_HOURS * 3600,
     )
@@ -57,7 +59,7 @@ async def login_endpoint(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_EXPIRY_HOURS * 3600,
     )

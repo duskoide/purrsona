@@ -10,5 +10,8 @@ class Settings(BaseSettings):
     JWT_EXPIRY_HOURS: int = 24
     BOOTSTRAP_ADMIN_EMAIL: str | None = None
 
+    # Environment
+    ENVIRONMENT: str = "development"
+
 
 settings = Settings()
