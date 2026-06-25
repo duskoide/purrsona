@@ -38,6 +38,7 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 3. THE Purrsona_System SHALL blur all public-facing location coordinates by applying a randomized offset within a 200-meter radius of the actual coordinates
 4. THE Purrsona_System SHALL store exact coordinates in the database for future authorized workflows while serving only blurred coordinates to public API responses
 5. WHEN a Public_Visitor selects a map marker, THE Frontend SHALL display a summary card with the associated Cat_Profile name, photo thumbnail, and timestamp
+6. THE Backend_API SHALL use PostGIS spatial queries (ST_Within or equivalent) to efficiently filter map markers by the requested geographic bounding box, rather than filtering in application code
 
 ### Requirement 2: Cat Profile Viewing
 
@@ -61,6 +62,9 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 3. THE Backend_API SHALL enforce role-based access control on every mutation endpoint
 4. THE Purrsona_System SHALL provide a verification workflow that elevates a Signed_In_User to Verified_User status
 5. THE Backend_API SHALL include the user role in the authentication token claims
+6. WHEN a Signed_In_User submits a verification request, THE Backend_API SHALL store the request with the user identity, evidence text, and a pending status
+7. THE Purrsona_System SHALL provide an admin endpoint (verified-role-only or a separate admin role) to approve or reject verification requests; for v1, this SHALL be a minimal API endpoint without requiring an admin UI
+8. WHEN an admin approves a verification request, THE Backend_API SHALL update the requesting user role to Verified_User and record the verification timestamp
 
 ### Requirement 4: Sighting Submission
 
@@ -75,6 +79,8 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 5. THE Backend_API SHALL store each confirmed sighting as an immutable historical record
 6. THE Backend_API SHALL associate each sighting with exactly one Cat_Profile before marking submission as complete
 7. WHEN a sighting submission is missing any required field, THE Backend_API SHALL return an HTTP 422 response specifying the missing fields
+8. THE Backend_API SHALL expire unconfirmed sighting drafts after 30 minutes
+9. IF a user attempts to confirm an expired sighting draft, THEN THE Backend_API SHALL return an HTTP 410 response indicating the draft has expired
 
 ### Requirement 5: Cat Matching via Two-Stage Pipeline (Metadata + MegaDescriptor)
 
@@ -87,10 +93,11 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 3. THE Embedding_Service SHALL query pgvector using cosine similarity against stored Cat_Profile embeddings, restricted to the candidate set produced by the Metadata_Filter
 4. THE Embedding_Service SHALL return at most 3 Match_Candidates ranked by descending cosine similarity score
 5. WHEN fewer than 3 Cat_Profiles exist with similarity above a configured threshold within the metadata-filtered candidate set, THE Embedding_Service SHALL return only those candidates that meet the threshold
-6. THE Frontend SHALL present Match_Candidates to the user alongside a "none of these" option
-7. WHEN the user selects "none of these," THE Backend_API SHALL create a new Cat_Profile and associate the sighting with the new profile
-8. WHEN the user confirms a Match_Candidate, THE Backend_API SHALL associate the sighting with the selected Cat_Profile
-9. THE Purrsona_System SHALL treat all Embedding_Service and Metadata_Filter output as advisory and SHALL NOT automatically link sightings without explicit user confirmation
+6. IF the metadata-filtered candidate set returns fewer than 3 Match_Candidates above the similarity threshold, THEN THE Metadata_Filter SHALL progressively relax filters (drop body_size first, then ear_tip_status, then pattern_type) and re-query until 3 candidates are found or no further relaxation is possible
+7. THE Frontend SHALL present Match_Candidates to the user alongside a "none of these" option
+8. WHEN the user selects "none of these," THE Backend_API SHALL create a new Cat_Profile and associate the sighting with the new profile
+9. WHEN the user confirms a Match_Candidate, THE Backend_API SHALL associate the sighting with the selected Cat_Profile
+10. THE Purrsona_System SHALL treat all Embedding_Service and Metadata_Filter output as advisory and SHALL NOT automatically link sightings without explicit user confirmation
 
 ### Requirement 6: Cat Profile Creation
 
@@ -99,10 +106,12 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 #### Acceptance Criteria
 
 1. WHEN a Signed_In_User selects "none of these" during sighting submission, THE Backend_API SHALL create a new Cat_Profile
-2. THE Backend_API SHALL initialize the new Cat_Profile with the sighting photo, location, timestamp, structured tags, and Cat_Metadata (coat color, pattern type, notable markings, ear tip status, body size) from the originating sighting
-3. THE Embedding_Service SHALL generate and store a 768-dimensional MegaDescriptor fur pattern embedding for the new Cat_Profile to enable future matching
-4. THE Backend_API SHALL store the Cat_Metadata on the new Cat_Profile to enable future metadata filtering
-5. THE Backend_API SHALL link the originating sighting as the first entry in the new Cat_Profile sighting history
+2. WHEN the user selects "none of these," THE Frontend SHALL prompt the user to provide an optional name or alias for the new Cat_Profile before confirmation
+3. THE Backend_API SHALL accept an optional name field during the sighting confirm step and store the name on the new Cat_Profile
+4. THE Backend_API SHALL initialize the new Cat_Profile with the sighting photo, location, timestamp, structured tags, and Cat_Metadata (coat color, pattern type, notable markings, ear tip status, body size) from the originating sighting
+5. THE Embedding_Service SHALL generate and store a 768-dimensional MegaDescriptor fur pattern embedding for the new Cat_Profile to enable future matching
+6. THE Backend_API SHALL store the Cat_Metadata on the new Cat_Profile to enable future metadata filtering
+7. THE Backend_API SHALL link the originating sighting as the first entry in the new Cat_Profile sighting history
 
 ### Requirement 7: Feeding Spot Management
 
@@ -194,6 +203,7 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 3. THE Frontend SHALL be responsive across viewport widths from 320px to 2560px
 4. THE Frontend SHALL meet WCAG 2.1 Level AA accessibility standards for all interactive components
 5. WHEN the Backend_API is unreachable, THE Frontend SHALL display a user-friendly error state with retry guidance
+6. THE Frontend SHALL provide login and registration pages with form validation, error display, and redirect to the originally requested page upon successful authentication
 
 ### Requirement 15: Design System Foundation
 
@@ -216,7 +226,20 @@ Purrsona v1 is a community cat tracker enabling shared sightings, persistent cat
 
 #### Acceptance Criteria
 
-1. THE Purrsona_System SHALL provide a Docker Compose configuration that runs the Frontend, Backend_API, PostgreSQL (with pgvector), and a local S3-compatible storage service
+1. THE Purrsona_System SHALL provide a Docker Compose configuration that runs the Frontend, Backend_API, PostgreSQL (with pgvector and PostGIS), and a local S3-compatible storage service
 2. WHEN a developer runs the Docker Compose configuration, THE Purrsona_System SHALL start all services with seeded test data within 120 seconds on a standard development machine
 3. THE Purrsona_System SHALL provide container image definitions suitable for production deployment via container orchestration
 4. THE Backend_API SHALL read all configuration values (database credentials, storage endpoints, model paths) from environment variables
+5. THE Docker container for the Backend_API SHALL include pre-downloaded MegaDescriptor model weights so that first startup does not require internet access for model download
+
+### Requirement 17: Cat Profile Editing
+
+**User Story:** As a Signed_In_User who created the profile OR a Verified_User, I want to edit cat profile fields, so that profiles stay accurate over time as more information becomes available.
+
+#### Acceptance Criteria
+
+1. THE Backend_API SHALL allow editing of Cat_Profile fields (name or alias, photos, coat_color, pattern_type, notable_markings, ear_tip_status, body_size) by the user who created the profile or by any Verified_User
+2. IF a user who is neither the profile creator nor a Verified_User attempts to edit a Cat_Profile, THEN THE Backend_API SHALL return an HTTP 403 response
+3. THE Backend_API SHALL treat sighting history and embedding as immutable fields that cannot be directly edited by users
+4. WHEN photos are added to or removed from a Cat_Profile, THE Embedding_Service SHALL recalculate and update the stored 768-dimensional MegaDescriptor embedding using the current primary photo
+5. THE Backend_API SHALL validate all Cat_Metadata enum fields (coat_color, pattern_type, body_size) against their defined value domains and return HTTP 422 for invalid values

@@ -60,17 +60,47 @@ User → Frontend → POST /api/v1/sightings/initiate
                      ├─ Upload photo → Image Store → reference URL
                      ├─ Stage 1: Metadata Filter (coat_color, pattern_type,
                      │           ear_tip_status, body_size) → candidate subset
+                     │           (progressive relaxation if < 3 candidates)
                      ├─ Stage 2: Generate MegaDescriptor embedding (768-dim)
                      │           → pgvector cosine search on filtered subset
+                     ├─ Store draft in sighting_drafts (expires in 30 min)
                      ├─ Return top-3 Match_Candidates
                      │
 User ← Frontend ← Match candidates + "none of these"
                      │
 User → Frontend → POST /api/v1/sightings/confirm
                      │
+                     ├─ Check draft_expires_at (410 if expired)
                      ├─ If match selected → link sighting to Cat_Profile
-                     ├─ If "none of these" → create Cat_Profile + link
-                     └─ Store immutable sighting record
+                     ├─ If "none of these" → create Cat_Profile (with optional name) + link
+                     └─ Store immutable sighting record, delete draft
+```
+
+### Request Flow: Authentication & Verification
+
+```
+User → Frontend → POST /api/v1/auth/register
+                     │
+                     ├─ Create user (role: signed_in)
+                     └─ Return JWT token with role claim
+
+User → Frontend → POST /api/v1/auth/login
+                     │
+                     └─ Validate credentials → Return JWT token
+
+Signed-In User → POST /api/v1/auth/verify-request
+                     │
+                     └─ Store verification_request (status: pending)
+
+Verified User → GET /api/v1/admin/verification-requests?status=pending
+                     │
+                     └─ Return pending requests
+
+Verified User → PATCH /api/v1/admin/verification-requests/{id}
+                     │
+                     ├─ Update request status (approved/rejected)
+                     ├─ Set reviewed_by and reviewed_at
+                     └─ If approved: Update user role to verified
 ```
 
 ## Data Models
@@ -78,43 +108,104 @@ User → Frontend → POST /api/v1/sightings/confirm
 ### Entity-Relationship Diagram
 
 ```
-┌──────────────┐       ┌──────────────────┐       ┌──────────────────┐
-│    users     │       │   cat_profiles   │       │    sightings     │
-├──────────────┤       ├──────────────────┤       ├──────────────────┤
-│ id (UUID PK) │       │ id (UUID PK)     │       │ id (UUID PK)     │
-│ email        │       │ name             │       │ cat_profile_id   │──→
-│ role (enum)  │       │ photos (JSONB)   │       │ user_id (FK)     │
-│ created_at   │       │ tnr_status(enum) │       │ photo_url        │
-│ verified_at  │       │ coat_color(enum) │       │ location (point) │
-└──────────────┘       │ pattern_type(enum)│      │ blurred_location │
-       │               │ notable_markings │       │ observed_at      │
-       │               │ ear_tip_status   │       │ condition_tags   │
-       │               │ body_size (enum) │       │ coat_color(enum) │
-       │               │ embedding(vec768)│       │ pattern_type(enum)│
-       │               │ created_at       │       │ notable_markings │
-       │               │ created_by (FK)  │       │ ear_tip_status   │
-       ▼               └──────────────────┘       │ body_size (enum) │
-┌──────────────────┐   ┌──────────────────┐       │ notes (nullable) │
-│  feeding_spots   │   │   tnr_records    │       │ created_at       │
-├──────────────────┤   ├──────────────────┤       └──────────────────┘
-│ id (UUID PK)     │   │ id (UUID PK)     │
-│ user_id (FK)     │   │ cat_profile_id   │
-│ location (point) │   │ user_id (FK)     │
-│ details (JSONB)  │   │ content (text)   │
-│ created_at       │   │ status_change    │
-└──────────────────┘   │ created_at       │
-                       └──────────────────┘
-┌──────────────────┐
-│ content_reports  │
-├──────────────────┤
-│ id (UUID PK)     │
-│ reporter_id (FK) │
-│ content_type     │
-│ content_id (UUID)│
-│ reason (enum)    │
-│ created_at       │
-└──────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                            ENTITY RELATIONSHIPS                                   │
+│                                                                                  │
+│  users (1) ──────< (N) sightings           "a user submits many sightings"      │
+│  users (1) ──────< (N) feeding_spots       "a user creates many feeding spots"  │
+│  users (1) ──────< (N) tnr_records         "a user creates many TNR records"    │
+│  users (1) ──────< (N) content_reports     "a user files many reports"          │
+│  users (1) ──────< (N) cat_profiles        "a user creates many cat profiles"   │
+│  users (1) ──────< (N) sighting_drafts     "a user has many pending drafts"     │
+│  users (1) ──────< (N) verification_requests "a user submits verif. requests"   │
+│  users (1) ──────< (N) verification_requests.reviewed_by "a reviewer reviews"   │
+│                                                                                  │
+│  cat_profiles (1) ──< (N) sightings        "a cat has many sightings"           │
+│  cat_profiles (1) ──< (N) tnr_records      "a cat has many TNR records"         │
+│                                                                                  │
+│  sighting_drafts are temporary (30-min TTL), not linked to cat_profiles yet      │
+│  content_reports use polymorphic reference (content_type + content_id)            │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+```
+┌──────────────┐         ┌──────────────────┐         ┌──────────────────┐
+│    users     │         │   cat_profiles   │         │    sightings     │
+├──────────────┤         ├──────────────────┤         ├──────────────────┤
+│ id (UUID PK) │◄─┐      │ id (UUID PK)     │◄─┐      │ id (UUID PK)     │
+│ email        │  │      │ name             │  │      │ cat_profile_id(FK)│───┐
+│ role (enum)  │  │      │ photos (JSONB)   │  │      │ user_id (FK)     │─┐ │
+│ created_at   │  │      │ tnr_status(enum) │  │      │ photo_url        │ │ │
+│ verified_at  │  │      │ coat_color(enum) │  │      │ location (point) │ │ │
+└──────────────┘  │      │ pattern_type(enum)│  │      │ blurred_location │ │ │
+                  │      │ notable_markings │  │      │ observed_at      │ │ │
+   ┌──────────────┤      │ ear_tip_status   │  │      │ condition_tags   │ │ │
+   │              │      │ body_size (enum) │  │      │ coat_color(enum) │ │ │
+   │   users.id   │      │ embedding(vec768)│  │      │ pattern_type(enum)│ │ │
+   │   is FK'd by:│      │ created_at       │  │      │ notable_markings │ │ │
+   │              │      │ created_by (FK)  │──┘      │ ear_tip_status   │ │ │
+   │              │      └──────────────────┘         │ body_size (enum) │ │ │
+   │              │                                   │ notes (nullable) │ │ │
+   │              │                                   │ created_at       │ │ │
+   │              │                                   └──────────────────┘ │ │
+   │              │                                                        │ │
+   │              │  ┌──────────────────┐    ┌──────────────────┐          │ │
+   │              │  │  feeding_spots   │    │   tnr_records    │          │ │
+   │              │  ├──────────────────┤    ├──────────────────┤          │ │
+   │              ├──│ user_id (FK)     │    │ cat_profile_id(FK)│─────────┘ │
+   │              │  │ id (UUID PK)     │    │ user_id (FK)     │────────┘   │
+   │              │  │ location (point) │    │ id (UUID PK)     │            │
+   │              │  │ blurred_location │    │ content (text)   │            │
+   │              │  │ details (JSONB)  │    │ status_change    │            │
+   │              │  │ created_at       │    │ created_at       │            │
+   │              │  └──────────────────┘    └──────────────────┘            │
+   │              │                                                          │
+   │              │  ┌──────────────────┐    ┌─────────────────────────┐     │
+   │              │  │ content_reports  │    │  sighting_drafts        │     │
+   │              │  ├──────────────────┤    ├─────────────────────────┤     │
+   │              ├──│ reporter_id (FK) │    │ id (UUID PK)            │     │
+   │              │  │ id (UUID PK)     │    │ user_id (FK)            │─────┘
+   │              │  │ content_type     │    │ photo_url               │
+   │              │  │ content_id (UUID)│    │ location (point)        │
+   │              │  │ reason (enum)    │    │ blurred_location        │
+   │              │  │ created_at       │    │ observed_at             │
+   │              │  └──────────────────┘    │ condition_tags          │
+   │              │                          │ coat_color (enum)       │
+   │              │  ┌─────────────────────┐ │ pattern_type (enum)     │
+   │              │  │verification_requests│ │ notable_markings        │
+   │              │  ├─────────────────────┤ │ ear_tip_status          │
+   │              ├──│ user_id (FK)        │ │ body_size (enum)        │
+   │              └──│ reviewed_by (FK)    │ │ notes                   │
+   │                 │ id (UUID PK)        │ │ embedding (vec768)      │
+   │                 │ evidence (text)     │ │ match_candidates (JSONB)│
+   │                 │ status (enum)       │ │ draft_expires_at        │
+   │                 │ created_at          │ │ created_at              │
+   │                 │ reviewed_at         │ └─────────────────────────┘
+   │                 └─────────────────────┘
+   │
+   │  Legend:
+   │    (FK) ──→  = foreign key reference
+   │    ◄─┐       = referenced by (target of FK)
+   │    (1) ──< (N) = one-to-many relationship
+   └───────────────────────────────────────────
+```
+
+### Entity Relationships (plain text)
+
+| Relationship | Type | Description |
+|---|---|---|
+| users → cat_profiles | One-to-Many | A user creates many cat profiles (`cat_profiles.created_by` → `users.id`) |
+| users → sightings | One-to-Many | A user submits many sightings (`sightings.user_id` → `users.id`) |
+| users → feeding_spots | One-to-Many | A user creates many feeding spots (`feeding_spots.user_id` → `users.id`) |
+| users → tnr_records | One-to-Many | A user creates many TNR records (`tnr_records.user_id` → `users.id`) |
+| users → content_reports | One-to-Many | A user files many reports (`content_reports.reporter_id` → `users.id`) |
+| users → sighting_drafts | One-to-Many | A user has many pending drafts (`sighting_drafts.user_id` → `users.id`) |
+| users → verification_requests | One-to-Many | A user submits verification requests (`verification_requests.user_id` → `users.id`) |
+| users → verification_requests (reviewer) | One-to-Many | A reviewer reviews many requests (`verification_requests.reviewed_by` → `users.id`) |
+| cat_profiles → sightings | One-to-Many | A cat profile accumulates many confirmed sightings (`sightings.cat_profile_id` → `cat_profiles.id`) |
+| cat_profiles → tnr_records | One-to-Many | A cat profile has many TNR records (`tnr_records.cat_profile_id` → `cat_profiles.id`) |
+| content_reports → (polymorphic) | Many-to-One | A report references one piece of content via `content_type` + `content_id` (can point to any entity) |
+| sighting_drafts | Temporary | Not linked to cat_profiles — drafts expire after 30 minutes and are deleted on confirmation or expiry |
 
 ### Database Schema (PostgreSQL + pgvector)
 
@@ -203,6 +294,37 @@ CREATE TABLE tnr_records (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE sighting_drafts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    photo_url VARCHAR(1024) NOT NULL,
+    location GEOMETRY(Point, 4326) NOT NULL,
+    blurred_location GEOMETRY(Point, 4326) NOT NULL,
+    observed_at TIMESTAMPTZ NOT NULL,
+    condition_tags JSONB NOT NULL,
+    coat_color coat_color_enum NOT NULL,
+    pattern_type pattern_type_enum NOT NULL,
+    notable_markings TEXT,
+    ear_tip_status BOOLEAN,
+    body_size body_size_enum,
+    notes TEXT,
+    embedding vector(768),
+    match_candidates JSONB NOT NULL DEFAULT '[]',
+    draft_expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 minutes'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE verification_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    evidence TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'approved', 'rejected')),
+    reviewed_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ
+);
+
 CREATE TABLE content_reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     reporter_id UUID NOT NULL REFERENCES users(id),
@@ -224,6 +346,8 @@ CREATE INDEX idx_sightings_cat_profile ON sightings(cat_profile_id);
 CREATE INDEX idx_sightings_observed_at ON sightings(observed_at DESC);
 CREATE INDEX idx_feeding_spots_location ON feeding_spots USING GIST(blurred_location);
 CREATE INDEX idx_sightings_location ON sightings USING GIST(blurred_location);
+CREATE INDEX idx_sighting_drafts_expires ON sighting_drafts(draft_expires_at);
+CREATE INDEX idx_verification_requests_status ON verification_requests(status);
 ```
 
 ## API Contracts
@@ -267,6 +391,8 @@ All API errors follow a consistent structure:
 ```
 GET /api/v1/map/markers
   Query: ?bounds=sw_lat,sw_lng,ne_lat,ne_lng&types=sighting,feeding_spot,tnr
+  Notes: Uses PostGIS ST_Within(blurred_location, ST_MakeEnvelope(sw_lng, sw_lat, ne_lng, ne_lat, 4326))
+         for spatial bounding box filtering via GIST index.
   Response 200:
     {
       "markers": [
@@ -350,7 +476,8 @@ POST /api/v1/sightings/confirm
   Body:
     {
       "sighting_draft_id": "uuid",
-      "selected_cat_profile_id": "uuid" | null  // null = "none of these"
+      "selected_cat_profile_id": "uuid" | null,  // null = "none of these"
+      "name": "Whiskers"  // optional, only used when selected_cat_profile_id is null
     }
   Response 201:
     {
@@ -360,6 +487,7 @@ POST /api/v1/sightings/confirm
     }
   Response 401: Unauthenticated
   Response 404: Draft not found
+  Response 410: Draft expired (past draft_expires_at)
 ```
 
 #### Feeding Spots (Authenticated)
@@ -440,6 +568,78 @@ POST /api/v1/auth/verify-request
   Response 202: { "message": "Verification request submitted" }
 ```
 
+#### Verification Workflow (Verified Role Only)
+
+```
+GET /api/v1/admin/verification-requests
+  Headers: Authorization: Bearer <token> (must be verified role)
+  Query: ?status=pending
+  Response 200:
+    {
+      "requests": [
+        {
+          "id": "uuid",
+          "user_id": "uuid",
+          "evidence": "I volunteer at local TNR clinic...",
+          "status": "pending",
+          "created_at": "2024-01-15T10:30:00Z"
+        }
+      ]
+    }
+  Response 403: Insufficient role (not verified)
+
+PATCH /api/v1/admin/verification-requests/{id}
+  Headers: Authorization: Bearer <token> (must be verified role)
+  Body:
+    {
+      "status": "approved" | "rejected"
+    }
+  Response 200:
+    {
+      "id": "uuid",
+      "user_id": "uuid",
+      "status": "approved",
+      "reviewed_by": "uuid",
+      "reviewed_at": "2024-01-15T12:00:00Z"
+    }
+  Response 403: Insufficient role (not verified)
+  Response 404: Request not found
+  Response 422: Invalid status value
+```
+
+#### Cat Profile Editing (Authenticated)
+
+```
+PATCH /api/v1/cats/{cat_id}
+  Headers: Authorization: Bearer <token>
+  Body:
+    {
+      "name": "Updated Name",             // optional
+      "photos": ["url1", "url2"],         // optional, triggers embedding recalculation
+      "coat_color": "orange",             // optional
+      "pattern_type": "tabby",            // optional
+      "notable_markings": "white chest",  // optional
+      "ear_tip_status": true,             // optional
+      "body_size": "medium"               // optional
+    }
+  Response 200:
+    {
+      "id": "uuid",
+      "name": "Updated Name",
+      "photos": ["url1", "url2"],
+      "coat_color": "orange",
+      "pattern_type": "tabby",
+      "notable_markings": "white chest",
+      "ear_tip_status": true,
+      "body_size": "medium",
+      "tnr_status": "unassessed"
+    }
+  Response 401: Unauthenticated
+  Response 403: Not profile creator and not verified user
+  Response 404: Cat profile not found
+  Response 422: Invalid enum values
+```
+
 ## Components and Interfaces
 
 ### Backend Components
@@ -448,7 +648,7 @@ POST /api/v1/auth/verify-request
 # === Service Layer Interfaces ===
 
 class ISightingService(Protocol):
-    """Manages sighting lifecycle: initiation, matching, confirmation."""
+    """Manages sighting lifecycle: initiation, matching, confirmation, and draft expiration."""
     async def initiate_sighting(
         self, user_id: str, photo: UploadFile, location: Coordinate,
         observed_at: datetime, condition_tags: list[str],
@@ -456,8 +656,14 @@ class ISightingService(Protocol):
     ) -> SightingDraft: ...
 
     async def confirm_sighting(
-        self, user_id: str, draft_id: str, selected_cat_id: str | None
+        self, user_id: str, draft_id: str, selected_cat_id: str | None,
+        name: str | None = None
     ) -> ConfirmedSighting: ...
+
+    async def cleanup_expired_drafts(self) -> int: ...
+
+    async def get_draft_or_expired(self, draft_id: str, user_id: str) -> SightingDraft: ...
+    """Retrieves draft; raises 410 Gone if draft_expires_at < NOW(), 404 if not found."""
 
 class IEmbeddingService(Protocol):
     """Generates MegaDescriptor fur pattern embeddings and performs similarity search."""
@@ -468,8 +674,20 @@ class IEmbeddingService(Protocol):
     ) -> list[MatchCandidate]: ...
 
 class IMetadataFilterService(Protocol):
-    """Pre-filters candidate Cat_Profiles by structured metadata (Stage 1)."""
-    def build_filter_query(self, metadata: CatMetadata) -> tuple[str, list]: ...
+    """Pre-filters candidate Cat_Profiles by structured metadata (Stage 1).
+    Supports progressive relaxation via excluded_filters parameter.
+    
+    Progressive relaxation strategy:
+    If initial filter + embedding returns < 3 candidates above the similarity
+    threshold, filters are dropped in order: body_size → ear_tip_status → pattern_type,
+    re-querying each time until 3 candidates are found or no further relaxation is possible.
+    coat_color is never relaxed.
+    """
+    RELAXATION_ORDER: list[str]  # ["body_size", "ear_tip_status", "pattern_type"]
+
+    def build_filter_query(
+        self, metadata: CatMetadata, excluded_filters: set[str] | None = None
+    ) -> tuple[str, list]: ...
 
 class IImageService(Protocol):
     """Handles image upload, validation, and storage."""
@@ -479,14 +697,23 @@ class IImageService(Protocol):
 class ICatProfileService(Protocol):
     """Manages cat profile CRUD and embedding updates."""
     async def get_profile(self, cat_id: str) -> CatProfile: ...
-    async def create_profile(self, sighting: SightingDraft) -> CatProfile: ...
+    async def create_profile(self, sighting: SightingDraft, name: str | None = None) -> CatProfile: ...
+    async def update_profile(
+        self, cat_id: str, user: User, updates: CatProfileUpdate
+    ) -> CatProfile: ...
     async def update_tnr_status(
         self, cat_id: str, status: str, user: User
     ) -> CatProfile: ...
+    async def can_edit_profile(self, cat_id: str, user: User) -> bool: ...
 
 class IMapService(Protocol):
-    """Provides blurred map data for public consumption."""
+    """Provides blurred map data for public consumption using PostGIS spatial queries.
+    
+    Uses ST_Within with ST_MakeEnvelope for bounding box filtering to leverage
+    spatial indexes rather than filtering in application code.
+    """
     async def get_markers(self, bounds: BoundingBox, types: list[str]) -> list[MapMarker]: ...
+    def build_spatial_query(self, bounds: BoundingBox) -> str: ...
 
 class IReportService(Protocol):
     """Handles content reporting."""
@@ -501,6 +728,10 @@ class IAuthService(Protocol):
     async def login(self, email: str, password: str) -> tuple[User, str]: ...
     def verify_token(self, token: str) -> TokenClaims: ...
     async def request_verification(self, user_id: str, evidence: str) -> None: ...
+    async def list_verification_requests(self, status: str | None = None) -> list[VerificationRequest]: ...
+    async def review_verification_request(
+        self, request_id: str, reviewer_id: str, decision: str
+    ) -> VerificationRequest: ...
 ```
 
 ### Frontend Components
@@ -667,34 +898,48 @@ class MetadataFilterService:
     Uses SQL WHERE clauses to narrow the candidate set before the more
     expensive embedding comparison. Only exact-match fields are used for
     filtering (coat_color, pattern_type, ear_tip_status, body_size).
+    
+    Supports progressive relaxation: if initial filters produce fewer than 3
+    candidates above the similarity threshold, filters are dropped in order
+    (body_size → ear_tip_status → pattern_type) and re-queried each time
+    until 3 candidates are found or no further relaxation is possible.
     """
 
-    def build_filter_query(self, metadata: CatMetadata) -> tuple[str, list]:
+    # Relaxation order: filters dropped from right to left
+    RELAXATION_ORDER = ["body_size", "ear_tip_status", "pattern_type"]
+
+    def build_filter_query(
+        self, metadata: CatMetadata, excluded_filters: set[str] | None = None
+    ) -> tuple[str, list]:
         """Build a SQL WHERE clause fragment from sighting metadata.
         
         Returns (where_clause, params) for composing into the similarity query.
-        Filters only on non-None fields. coat_color and pattern_type are required.
+        Filters only on non-None fields. coat_color is always required.
+        excluded_filters specifies filter names to skip during progressive relaxation.
         """
+        excluded = excluded_filters or set()
         conditions = []
         params = []
         param_idx = 1
 
-        # Required filters (always present on sighting submission)
+        # coat_color is never relaxed (always present on sighting submission)
         conditions.append(f"coat_color = ${param_idx}")
         params.append(metadata.coat_color)
         param_idx += 1
 
-        conditions.append(f"pattern_type = ${param_idx}")
-        params.append(metadata.pattern_type)
-        param_idx += 1
+        # pattern_type: can be relaxed
+        if "pattern_type" not in excluded:
+            conditions.append(f"pattern_type = ${param_idx}")
+            params.append(metadata.pattern_type)
+            param_idx += 1
 
-        # Optional filters (only applied if provided)
-        if metadata.ear_tip_status is not None:
+        # Optional filters (only applied if provided and not excluded)
+        if metadata.ear_tip_status is not None and "ear_tip_status" not in excluded:
             conditions.append(f"ear_tip_status = ${param_idx}")
             params.append(metadata.ear_tip_status)
             param_idx += 1
 
-        if metadata.body_size is not None:
+        if metadata.body_size is not None and "body_size" not in excluded:
             conditions.append(f"body_size = ${param_idx}")
             params.append(metadata.body_size)
             param_idx += 1
@@ -743,41 +988,70 @@ class EmbeddingService:
         metadata_filter: MetadataFilterService,
         db_session,
     ) -> List[MatchCandidate]:
-        """Two-stage matching: metadata filter → cosine similarity on filtered subset.
+        """Two-stage matching with progressive relaxation.
         
         Stage 1: SQL WHERE clauses filter by coat_color, pattern_type,
                  ear_tip_status, body_size to narrow candidate set.
         Stage 2: pgvector cosine similarity on the metadata-filtered subset.
+        
+        Progressive relaxation strategy:
+        If fewer than MAX_CANDIDATES (3) are found above the similarity threshold,
+        progressively relax metadata filters in defined order:
+          Step 0: All filters active (coat_color + pattern_type + ear_tip_status + body_size)
+          Step 1: Drop body_size
+          Step 2: Drop ear_tip_status
+          Step 3: Drop pattern_type
+        Re-query at each step. coat_color is never dropped.
+        Stop as soon as 3 candidates are found or no relaxation remains.
         """
-        # Stage 1: Build metadata filter
-        where_clause, filter_params = metadata_filter.build_filter_query(metadata)
+        excluded_filters: set[str] = set()
 
-        # Stage 2: Cosine similarity on filtered subset
-        embedding_param_idx = len(filter_params) + 1
-        threshold_param_idx = embedding_param_idx + 1
-        limit_param_idx = threshold_param_idx + 1
-
-        query = f"""
-            SELECT id, name, photos, 
-                   1 - (embedding <=> ${embedding_param_idx}::vector) AS similarity
-            FROM cat_profiles
-            WHERE embedding IS NOT NULL
-              AND {where_clause}
-              AND 1 - (embedding <=> ${embedding_param_idx}::vector) >= ${threshold_param_idx}
-            ORDER BY similarity DESC
-            LIMIT ${limit_param_idx}
-        """
-        params = filter_params + [embedding, self.SIMILARITY_THRESHOLD, self.MAX_CANDIDATES]
-        rows = await db_session.fetch(query, *params)
-        return [
-            MatchCandidate(
-                cat_profile_id=str(row["id"]),
-                name=row["name"] or "Unknown",
-                photo_url=row["photos"][0] if row["photos"] else "",
-                similarity_score=float(row["similarity"]),
+        for relaxation_step in range(len(MetadataFilterService.RELAXATION_ORDER) + 1):
+            # Build filter with current exclusions
+            where_clause, filter_params = metadata_filter.build_filter_query(
+                metadata, excluded_filters=excluded_filters
             )
-            for row in rows
-        ]
+
+            # Cosine similarity on filtered subset
+            embedding_param_idx = len(filter_params) + 1
+            threshold_param_idx = embedding_param_idx + 1
+            limit_param_idx = threshold_param_idx + 1
+
+            query = f"""
+                SELECT id, name, photos, 
+                       1 - (embedding <=> ${embedding_param_idx}::vector) AS similarity
+                FROM cat_profiles
+                WHERE embedding IS NOT NULL
+                  AND {where_clause}
+                  AND 1 - (embedding <=> ${embedding_param_idx}::vector) >= ${threshold_param_idx}
+                ORDER BY similarity DESC
+                LIMIT ${limit_param_idx}
+            """
+            params = filter_params + [embedding, self.SIMILARITY_THRESHOLD, self.MAX_CANDIDATES]
+            rows = await db_session.fetch(query, *params)
+
+            candidates = [
+                MatchCandidate(
+                    cat_profile_id=str(row["id"]),
+                    name=row["name"] or "Unknown",
+                    photo_url=row["photos"][0] if row["photos"] else "",
+                    similarity_score=float(row["similarity"]),
+                )
+                for row in rows
+            ]
+
+            # If we have enough candidates or no more filters to relax, return
+            if len(candidates) >= self.MAX_CANDIDATES:
+                return candidates
+            if relaxation_step >= len(MetadataFilterService.RELAXATION_ORDER):
+                return candidates
+
+            # Relax the next filter in order
+            excluded_filters.add(
+                MetadataFilterService.RELAXATION_ORDER[relaxation_step]
+            )
+
+        return candidates  # fallback (unreachable)
 ```
 
 ### Image Validation
@@ -876,6 +1150,212 @@ async def update_tnr_status(
     )
 ```
 
+### Map Service: PostGIS Spatial Queries
+
+```python
+from dataclasses import dataclass
+from typing import List
+
+@dataclass
+class BoundingBox:
+    sw_lat: float
+    sw_lng: float
+    ne_lat: float
+    ne_lng: float
+
+@dataclass
+class MapMarker:
+    id: str
+    type: str  # 'sighting' | 'feeding_spot' | 'tnr'
+    location: dict  # {"lat": float, "lng": float} — always blurred
+    cat_profile: dict | None
+    timestamp: str
+    tnr_status: str | None
+
+class MapService:
+    """Provides blurred map markers filtered by PostGIS bounding box.
+    
+    Uses ST_Within with ST_MakeEnvelope to leverage the GIST spatial index
+    on blurred_location columns, avoiding in-application coordinate filtering.
+    """
+
+    async def get_markers(
+        self, bounds: BoundingBox, types: list[str], db_session
+    ) -> List[MapMarker]:
+        """Fetch map markers within the given bounding box using PostGIS spatial filtering."""
+        markers: List[MapMarker] = []
+        envelope = self._make_envelope_sql(bounds)
+
+        if "sighting" in types:
+            query = f"""
+                SELECT s.id, s.blurred_location, s.observed_at,
+                       cp.id as cat_id, cp.name as cat_name, cp.photos
+                FROM sightings s
+                JOIN cat_profiles cp ON s.cat_profile_id = cp.id
+                WHERE ST_Within(s.blurred_location, {envelope})
+                ORDER BY s.observed_at DESC
+            """
+            rows = await db_session.fetch(query)
+            markers.extend(self._rows_to_markers(rows, "sighting"))
+
+        if "feeding_spot" in types:
+            query = f"""
+                SELECT id, blurred_location, created_at
+                FROM feeding_spots
+                WHERE ST_Within(blurred_location, {envelope})
+            """
+            rows = await db_session.fetch(query)
+            markers.extend(self._rows_to_markers(rows, "feeding_spot"))
+
+        if "tnr" in types:
+            query = f"""
+                SELECT cp.id, s.blurred_location, cp.tnr_status, cp.name, cp.photos,
+                       MAX(s.observed_at) as latest_sighting
+                FROM cat_profiles cp
+                JOIN sightings s ON s.cat_profile_id = cp.id
+                WHERE cp.tnr_status != 'unassessed'
+                  AND ST_Within(s.blurred_location, {envelope})
+                GROUP BY cp.id, s.blurred_location
+            """
+            rows = await db_session.fetch(query)
+            markers.extend(self._rows_to_markers(rows, "tnr"))
+
+        return markers
+
+    def _make_envelope_sql(self, bounds: BoundingBox) -> str:
+        """Build ST_MakeEnvelope expression for bounding box filtering.
+        
+        ST_MakeEnvelope(xmin, ymin, xmax, ymax, srid)
+        where x=longitude, y=latitude, srid=4326 (WGS84).
+        """
+        return (
+            f"ST_MakeEnvelope({bounds.sw_lng}, {bounds.sw_lat}, "
+            f"{bounds.ne_lng}, {bounds.ne_lat}, 4326)"
+        )
+
+    def _rows_to_markers(self, rows, marker_type: str) -> List[MapMarker]:
+        """Convert database rows to MapMarker instances."""
+        # Implementation converts PostGIS point to lat/lng dict
+        ...
+```
+
+### Sighting Draft Expiration & Cleanup
+
+```python
+from datetime import datetime, timezone
+from fastapi import HTTPException
+
+DRAFT_TTL_MINUTES = 30
+
+async def confirm_sighting(
+    draft_id: str, user_id: str, selected_cat_id: str | None,
+    name: str | None, db_session
+) -> dict:
+    """Confirm a sighting draft. Returns 410 if draft has expired."""
+    draft = await db_session.fetchrow(
+        "SELECT * FROM sighting_drafts WHERE id = $1 AND user_id = $2",
+        draft_id, user_id,
+    )
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    if draft["draft_expires_at"] < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Sighting draft has expired")
+
+    # ... proceed with confirmation logic (link to profile or create new)
+    ...
+
+
+async def cleanup_expired_drafts(db_session) -> int:
+    """Periodic cleanup: delete all drafts past their expiration time.
+    
+    Should be invoked by a background task (e.g., FastAPI on_event startup
+    with asyncio.create_task + sleep loop) or an external cron/pg_cron job.
+    
+    Runs every 10 minutes. Deletes expired drafts in batches.
+    """
+    result = await db_session.execute(
+        "DELETE FROM sighting_drafts WHERE draft_expires_at < NOW()"
+    )
+    return result  # number of rows deleted
+```
+
+### Cat Profile Editing & Authorization
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class CatProfileUpdate:
+    """Fields that can be edited on a Cat_Profile. All optional."""
+    name: Optional[str] = None
+    photos: Optional[list[str]] = None
+    coat_color: Optional[str] = None
+    pattern_type: Optional[str] = None
+    notable_markings: Optional[str] = None
+    ear_tip_status: Optional[bool] = None
+    body_size: Optional[str] = None
+
+
+async def can_edit_profile(cat_profile_id: str, user, db_session) -> bool:
+    """Authorization check: only the profile creator or a verified user can edit.
+    
+    Returns True if the user is the creator of the cat profile OR has the
+    verified role. Returns False otherwise.
+    """
+    if user.role == UserRole.VERIFIED:
+        return True
+    profile = await db_session.fetchrow(
+        "SELECT created_by FROM cat_profiles WHERE id = $1", cat_profile_id
+    )
+    if profile is None:
+        return False
+    return str(profile["created_by"]) == str(user.id)
+
+
+async def update_cat_profile(
+    cat_id: str, user, updates: CatProfileUpdate,
+    embedding_service, db_session
+) -> dict:
+    """Update editable fields on a cat profile.
+    
+    - Sighting history and embedding are not directly editable.
+    - If photos change, triggers embedding recalculation.
+    """
+    if not await can_edit_profile(cat_id, user, db_session):
+        raise HTTPException(status_code=403, detail="Not authorized to edit this profile")
+
+    # Validate enum fields
+    if updates.coat_color and updates.coat_color not in VALID_COAT_COLORS:
+        raise HTTPException(status_code=422, detail="Invalid coat_color value")
+    if updates.pattern_type and updates.pattern_type not in VALID_PATTERN_TYPES:
+        raise HTTPException(status_code=422, detail="Invalid pattern_type value")
+    if updates.body_size and updates.body_size not in VALID_BODY_SIZES:
+        raise HTTPException(status_code=422, detail="Invalid body_size value")
+
+    # Build UPDATE query from provided fields (excluding None)
+    # ... SQL update logic ...
+
+    # If photos changed, recalculate embedding from new primary photo
+    if updates.photos is not None:
+        from PIL import Image
+        import httpx
+        primary_photo_url = updates.photos[0] if updates.photos else None
+        if primary_photo_url:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(primary_photo_url)
+                image = Image.open(resp.content)
+            new_embedding = embedding_service.generate_embedding(image)
+            await db_session.execute(
+                "UPDATE cat_profiles SET embedding = $1 WHERE id = $2",
+                new_embedding, cat_id,
+            )
+
+    # Return updated profile
+    ...
+```
+
 ## Frontend Architecture
 
 ### Page Structure
@@ -891,8 +1371,8 @@ pages/
 ├── feeding-spots/
 │   └── new.tsx            → Feeding spot creation (CSR, auth required)
 ├── auth/
-│   ├── login.tsx          → Login page
-│   └── register.tsx       → Registration page
+│   ├── login.tsx          → Login page (CSR, form validation, error display, redirect on success)
+│   └── register.tsx       → Registration page (CSR, form validation, error display, redirect on success)
 └── api/                   → Next.js API routes (proxying to FastAPI if needed)
 ```
 
@@ -1162,7 +1642,7 @@ services:
     depends_on: [db, minio]
 
   db:
-    image: pgvector/pgvector:pg16
+    image: postgis/postgis:16-3.4
     ports: ["5432:5432"]
     environment:
       - POSTGRES_USER=purrsona
@@ -1170,7 +1650,8 @@ services:
       - POSTGRES_DB=purrsona
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backend/migrations/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+      - ./backend/migrations/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
+      - ./backend/migrations/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
 
   minio:
     image: minio/minio
@@ -1185,6 +1666,35 @@ services:
 volumes:
   pgdata:
   minio_data:
+```
+
+### Backend Dockerfile (with MegaDescriptor pre-download)
+
+```dockerfile
+# backend/Dockerfile
+FROM python:3.11-slim AS base
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download MegaDescriptor model weights at build time
+# so first startup does not require internet access
+RUN python -c "\
+import timm; \
+model = timm.create_model('hf-hub:BVRA/MegaDescriptor-T-224', pretrained=True); \
+print('MegaDescriptor weights cached successfully')"
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ### Production Container Architecture
@@ -1273,6 +1783,11 @@ Property-based tests validate universal invariants across randomly generated inp
 - Metadata filter query correctness (Property 23)
 - API error structure consistency (Property 17)
 - Rate limiting behavior (Property 19)
+- Progressive filter relaxation monotonicity (Property 25)
+- Sighting draft expiration boundary (Property 26)
+- Cat profile edit authorization (Property 27)
+- Photo edit triggers embedding recalculation (Property 28)
+- Spatial bounding box query correctness (Property 30)
 
 **Frontend (TypeScript + fast-check):**
 - Spacing tokens grid alignment (Property 20)
@@ -1453,3 +1968,39 @@ Property-based tests validate universal invariants across randomly generated inp
 *For any* newly created Cat_Profile (via "none of these" selection), the Cat_Profile record SHALL contain the coat_color, pattern_type, notable_markings, ear_tip_status, and body_size values from the originating sighting, enabling future metadata-based pre-filtering.
 
 **Validates: Requirements 6.2, 6.4**
+
+### Property 25: Progressive filter relaxation expands candidate set
+
+*For any* metadata filter configuration and any relaxation step, the set of Cat_Profiles matching after relaxation SHALL be a superset of the set matching before relaxation. Each relaxation step (dropping body_size → ear_tip_status → pattern_type) SHALL only remove a filter constraint, never add one, and coat_color SHALL never be relaxed.
+
+**Validates: Requirements 5.6**
+
+### Property 26: Sighting draft expiration boundary
+
+*For any* sighting draft, if the elapsed time between `created_at` and the confirmation attempt exceeds 30 minutes (i.e., `NOW() > draft_expires_at`), the confirm endpoint SHALL return an HTTP 410 response. If the elapsed time is within 30 minutes, the confirm endpoint SHALL proceed normally.
+
+**Validates: Requirements 4.8, 4.9**
+
+### Property 27: Cat profile edit authorization
+
+*For any* user and *for any* Cat_Profile, the edit operation SHALL succeed if and only if the user is the `created_by` user of that profile OR the user has the `verified` role. All other users SHALL receive an HTTP 403 response.
+
+**Validates: Requirements 17.1, 17.2**
+
+### Property 28: Photo edit triggers embedding recalculation
+
+*For any* Cat_Profile edit that modifies the `photos` field, the system SHALL invoke the Embedding_Service to recalculate the stored 768-dimensional MegaDescriptor embedding using the new primary photo. Edits that do not modify `photos` SHALL leave the embedding unchanged.
+
+**Validates: Requirements 17.4**
+
+### Property 29: Sighting history and embedding immutability on edit
+
+*For any* Cat_Profile edit request, regardless of the request payload contents, the `sighting_history` association and the `embedding` field SHALL NOT be directly modifiable by the user. Any attempt to set these fields via the edit endpoint SHALL be ignored or rejected.
+
+**Validates: Requirements 17.3**
+
+### Property 30: Spatial bounding box query correctness
+
+*For any* bounding box defined by (sw_lat, sw_lng, ne_lat, ne_lng), the map markers endpoint SHALL return exactly those markers whose blurred_location falls within the bounding box, and SHALL exclude all markers outside it.
+
+**Validates: Requirements 1.6**
