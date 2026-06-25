@@ -81,7 +81,7 @@ INSERT INTO tnr_records (id, cat_profile_id, user_id, content, status_change) VA
 
 -- Verification requests (one pending)
 INSERT INTO verification_requests (id, user_id, evidence, status) VALUES
-    ('g0000000-0000-0000-0000-000000000001',
+    ('f0000000-0000-0000-0000-000000000002',
      'a0000000-0000-0000-0000-000000000004',
      'I volunteer at the local TNR clinic and have been doing community cat care for 3 years',
      'pending');
