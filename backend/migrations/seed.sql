@@ -2,12 +2,12 @@
 -- Dev/test data for local development
 
 -- Users (passwords are all "password123" hashed with bcrypt)
--- bcrypt hash: $2b$12$LJ3m4ys3Lz0YBGQxKvGqeOBUOzHMdPpMTJmF1mQKc1ovCZYZb0S/C
+-- bcrypt hash: $2b$12$0Q/ziouyknzgBWGu4tCP4.ElqX7jIaMRG22e3SedmYUFzNk26e2pW
 INSERT INTO users (id, email, password_hash, role, verified_at) VALUES
-    ('a0000000-0000-0000-0000-000000000001', 'admin@purrsona.local', '$2b$12$LJ3m4ys3Lz0YBGQxKvGqeOBUOzHMdPpMTJmF1mQKc1ovCZYZb0S/C', 'verified', NOW()),
-    ('a0000000-0000-0000-0000-000000000002', 'caretaker@purrsona.local', '$2b$12$LJ3m4ys3Lz0YBGQxKvGqeOBUOzHMdPpMTJmF1mQKc1ovCZYZb0S/C', 'verified', NOW()),
-    ('a0000000-0000-0000-0000-000000000003', 'user@purrsona.local', '$2b$12$LJ3m4ys3Lz0YBGQxKvGqeOBUOzHMdPpMTJmF1mQKc1ovCZYZb0S/C', 'signed_in', NULL),
-    ('a0000000-0000-0000-0000-000000000004', 'volunteer@purrsona.local', '$2b$12$LJ3m4ys3Lz0YBGQxKvGqeOBUOzHMdPpMTJmF1mQKc1ovCZYZb0S/C', 'signed_in', NULL);
+    ('a0000000-0000-0000-0000-000000000001', 'admin@purrsona.local', '$2b$12$0Q/ziouyknzgBWGu4tCP4.ElqX7jIaMRG22e3SedmYUFzNk26e2pW', 'verified', NOW()),
+    ('a0000000-0000-0000-0000-000000000002', 'caretaker@purrsona.local', '$2b$12$0Q/ziouyknzgBWGu4tCP4.ElqX7jIaMRG22e3SedmYUFzNk26e2pW', 'verified', NOW()),
+    ('a0000000-0000-0000-0000-000000000003', 'user@purrsona.local', '$2b$12$0Q/ziouyknzgBWGu4tCP4.ElqX7jIaMRG22e3SedmYUFzNk26e2pW', 'signed_in', NULL),
+    ('a0000000-0000-0000-0000-000000000004', 'volunteer@purrsona.local', '$2b$12$0Q/ziouyknzgBWGu4tCP4.ElqX7jIaMRG22e3SedmYUFzNk26e2pW', 'signed_in', NULL);
 
 -- Cat profiles (no embeddings yet — will be generated on first sighting confirmation)
 INSERT INTO cat_profiles (id, name, photos, tnr_status, coat_color, pattern_type, notable_markings, ear_tip_status, body_size, created_by) VALUES
