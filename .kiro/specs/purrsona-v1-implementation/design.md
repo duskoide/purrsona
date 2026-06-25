@@ -49,7 +49,7 @@ Purrsona v1 is a community cat tracker comprising a Next.js frontend, FastAPI ba
 | Database | PostgreSQL 16 + pgvector | Relational data, embedding vectors, spatial data |
 | Image Store | MinIO (dev) / S3 (prod) | Photo storage, public URL serving |
 | Metadata Filter | SQL-based pre-filter | Narrows candidate set by coat color, pattern, ear tip, body size |
-| Embedding Service | MegaDescriptor (ViT-B/14), in-process | 768-dim fur pattern embedding generation, cosine similarity search |
+| Embedding Service | MegaDescriptor (Swin-Tiny), in-process | 768-dim fur pattern embedding generation, cosine similarity search |
 | Auth | JWT-based, role claims | Authentication, authorization |
 
 ### Request Flow: Sighting Submission
@@ -476,8 +476,9 @@ GET /api/v1/cats/{cat_id}
         }
       ],
       "feeding_notes": [...],
-      "status_tags": [...]
+      "status_tags": [...]  // COMPUTED: aggregated + deduplicated from condition_tags across all linked sightings (not stored)
     }
+```
 
 GET /api/v1/cats
   Query: ?page=1&per_page=20
@@ -743,7 +744,12 @@ class IImageService(Protocol):
     def validate_image(self, content_type: str, size: int) -> ValidationResult: ...
 
 class ICatProfileService(Protocol):
-    """Manages cat profile CRUD and embedding updates."""
+    """Manages cat profile CRUD and embedding updates.
+    
+    Note: status_tags in the API response is a computed/derived field —
+    aggregated + deduplicated from condition_tags across all linked sightings.
+    It is not stored as a column on cat_profiles.
+    """
     async def get_profile(self, cat_id: str) -> CatProfile: ...
     async def create_profile(self, sighting: SightingDraft, name: str | None = None) -> CatProfile: ...
     async def update_profile(
@@ -999,7 +1005,7 @@ class MetadataFilterService:
 class EmbeddingService:
     """Stage 2: Generates MegaDescriptor embeddings and performs similarity search.
     
-    Uses MegaDescriptor (ViT-B/14) trained specifically for animal
+    Uses MegaDescriptor (Swin-Tiny) trained specifically for animal
     re-identification. Produces 768-dimensional fur pattern embeddings
     optimized for distinguishing individual animals by visual appearance.
     """
@@ -1011,7 +1017,7 @@ class EmbeddingService:
         self.model = timm.create_model(model_name, pretrained=True)
         self.model = self.model.to(self.device).eval()
         
-        # Standard preprocessing for ViT-B/14 (224x224 input)
+        # Standard preprocessing for MegaDescriptor Swin-Tiny (224x224 input)
         self.preprocess = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.ToTensor(),

@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary-50: 254 243 226;
+    --color-primary-100: 253 228 185;
+    --color-primary-200: 252 212 140;
+    --color-primary-300: 251 196 95;
+    --color-primary-400: 250 184 61;
+    --color-primary-500: 249 172 27;
+    --color-primary-600: 232 154 23;
+    --color-primary-700: 201 129 18;
+    --color-primary-800: 170 104 14;
+    --color-primary-900: 123 74 9;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  }
+
+  body {
+    @apply bg-neutral-50 text-neutral-900 antialiased;
+    font-family: var(--font-sans);
+  }
+}
