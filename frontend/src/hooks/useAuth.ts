@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-interface User {
+export interface User {
   id: string;
   email: string;
   role: string;
