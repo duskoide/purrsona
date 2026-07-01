@@ -64,7 +64,7 @@ export function NavigationBar() {
                 <Link
                   href="/auth/register"
                   className={`text-sm font-bold px-4 py-1.5 border-2 border-neutral-900
-                    shadow-[3px_3px_0_#111827] hover:shadow-[6px_6px_0_#111827]
+                    shadow-[3px_3px_0_#272220] hover:shadow-[6px_6px_0_#272220]
                     hover:-translate-x-0.5 hover:-translate-y-0.5
                     focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
                     ${isActive("/auth/register")

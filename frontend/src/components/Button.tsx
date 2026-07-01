@@ -12,13 +12,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-primary-500 text-white border-2 border-neutral-900 shadow-[6px_6px_0_#111827]",
+    "bg-primary-500 text-white border-2 border-neutral-900 shadow-[6px_6px_0_#272220]",
   secondary:
-    "bg-secondary-400 text-neutral-900 border-2 border-neutral-900 shadow-[6px_6px_0_#111827]",
+    "bg-secondary-400 text-neutral-900 border-2 border-neutral-900 shadow-[6px_6px_0_#272220]",
   ghost:
     "bg-transparent text-primary-500 border-2 border-primary-500",
   destructive:
-    "bg-error-main text-white border-2 border-neutral-900 shadow-[6px_6px_0_#111827]",
+    "bg-error-main text-white border-2 border-neutral-900 shadow-[6px_6px_0_#272220]",
 };
 
 const sizeStyles: Record<Size, string> = {
@@ -53,8 +53,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           transition-all duration-100 ease-out cursor-pointer select-none
           focus-visible:outline-3 focus-visible:outline-offset-3
           ${variant === "primary" || variant === "secondary" || variant === "destructive"
-            ? `hover:shadow-[8px_8px_0_#111827] hover:-translate-x-0.5 hover:-translate-y-0.5
-               active:shadow-[2px_2px_0_#111827] active:translate-x-1 active:translate-y-1
+            ? `hover:shadow-[8px_8px_0_#272220] hover:-translate-x-0.5 hover:-translate-y-0.5
+               active:shadow-[2px_2px_0_#272220] active:translate-x-1 active:translate-y-1
                focus-visible:outline-secondary-400`
             : "hover:bg-primary-50 active:bg-primary-100 focus-visible:outline-primary-500"
           }

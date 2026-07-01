@@ -8,12 +8,12 @@ interface CardProps {
 }
 
 const variantStyles: Record<string, string> = {
-  standard: "bg-white border-2 border-neutral-900 shadow-[6px_6px_0_#111827]",
+  standard: "bg-white border-2 border-neutral-900 shadow-[6px_6px_0_#272220]",
   featured:
-    "bg-white border-2 border-neutral-900 shadow-[4px_4px_0_#4502FF,8px_8px_0_#FFDA14,12px_12px_0_#111827]",
-  score: "bg-primary-500 text-white border-2 border-neutral-900 shadow-[6px_6px_0_#111827]",
+    "bg-white border-2 border-neutral-900 shadow-[4px_4px_0_#e8731a,8px_8px_0_#ef8c38,12px_12px_0_#272220]",
+  score: "bg-primary-500 text-white border-2 border-neutral-900 shadow-[6px_6px_0_#272220]",
   achievement:
-    "bg-secondary-400 text-neutral-900 border-2 border-neutral-900 shadow-[4px_4px_0_#4502FF,8px_8px_0_#FFDA14,12px_12px_0_#111827]",
+    "bg-secondary-400 text-neutral-900 border-2 border-neutral-900 shadow-[4px_4px_0_#e8731a,8px_8px_0_#ef8c38,12px_12px_0_#272220]",
   locked: "bg-neutral-200 text-neutral-500 border-2 border-neutral-400 opacity-60",
 };
 

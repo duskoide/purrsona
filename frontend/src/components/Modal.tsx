@@ -66,8 +66,8 @@ export function Modal({ open, onClose, title, children, destructive = false }: M
         aria-labelledby="modal-title"
         className={`relative bg-white border-2 border-neutral-900 max-w-md w-full mx-4 p-6
           ${destructive
-            ? "shadow-[4px_4px_0_#DC2626,8px_8px_0_#111827]"
-            : "shadow-[4px_4px_0_#4502FF,8px_8px_0_#FFDA14,12px_12px_0_#111827]"
+            ? "shadow-[4px_4px_0_#DC2626,8px_8px_0_#272220]"
+            : "shadow-[4px_4px_0_#e8731a,8px_8px_0_#ef8c38,12px_12px_0_#272220]"
           }`}
       >
         <div className="flex justify-between items-center mb-4">

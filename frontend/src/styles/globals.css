@@ -11,13 +11,13 @@
 
   /* Yellow focus ring on blue/dark backgrounds */
   :focus-visible {
-    outline: 3px solid #FFDA14;
+    outline: 3px solid #ef8c38;
     outline-offset: 3px;
   }
 
   /* Blue focus ring on light backgrounds */
   .focus-ring-light:focus-visible {
-    outline: 3px solid #4502FF;
+    outline: 3px solid #e8731a;
     outline-offset: 3px;
   }
 }
@@ -53,11 +53,11 @@
   }
   .arcade-press:hover {
     transform: translate(-2px, -2px);
-    box-shadow: 8px 8px 0 #111827;
+    box-shadow: 8px 8px 0 #272220;
   }
   .arcade-press:active {
     transform: translate(4px, 4px);
-    box-shadow: 2px 2px 0 #111827;
+    box-shadow: 2px 2px 0 #272220;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -66,11 +66,11 @@
     }
     .arcade-press:hover {
       transform: none;
-      box-shadow: 8px 8px 0 #111827;
+      box-shadow: 8px 8px 0 #272220;
     }
     .arcade-press:active {
       transform: none;
-      box-shadow: 2px 2px 0 #111827;
+      box-shadow: 2px 2px 0 #272220;
       background-blend-mode: multiply;
     }
     .pixel-spinner-dot {

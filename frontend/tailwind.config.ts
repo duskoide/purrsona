@@ -21,9 +21,9 @@ const config: Config = {
         lg: shadows.lg,
         xl: shadows.xl,
         rainbow: shadows.rainbow,
-        "press-sm": "3px 3px 0 #111827",
-        "press-md": "6px 6px 0 #111827",
-        "press-lg": "8px 8px 0 #111827",
+        "press-sm": "3px 3px 0 #272220",
+        "press-md": "6px 6px 0 #272220",
+        "press-lg": "8px 8px 0 #272220",
       },
       fontFamily: {
         sans: ['"VT323"', "monospace"],
