@@ -51,10 +51,10 @@ When creating new components, follow the patterns in existing components. Do NOT
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Primary | `#4502FF` | Electric blue — actions, selected, active |
-| Secondary | `#FFDA14` | Yellow — highlights, rewards, focus |
-| Text | `#111827` | Body text, outlines, offset blocks |
-| Surface | `#FFFFFF` | Cards, panels, forms |
+| Primary | `#e8731a` | Orange — actions, selected, active |
+| Secondary | `#ef8c38` | Amber — highlights, rewards, focus |
+| Text | `#272220` | Body text, outlines, offset blocks |
+| Surface | `#fffbf5` | Cards, panels, forms |
 
 Semantic: success `#16A34A`, warning `#D97706`, danger `#DC2626`.
 
