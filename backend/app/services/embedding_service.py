@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import io
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import torch
 from PIL import Image
 from timm import create_model
-from timm.data import resolve_data_config
+from timm.data import resolve_data_config  # type: ignore[attr-defined]
 from timm.data.transforms_factory import create_transform
 
 from app.core.config import settings
@@ -23,31 +23,35 @@ class EmbeddingService:
     """Cat fur pattern embedding extraction and similarity search."""
 
     def __init__(self) -> None:
-        self._model = None
-        self._transform = None
+        self._model: torch.nn.Module | None = None
+        self._transform: Any = None
 
     def load_model(self) -> None:
         """Load MegaDescriptor model. Call at startup."""
-        self._model = create_model(
+        model = create_model(
             MODEL_ID,
             pretrained=True,
             num_classes=0,  # remove classification head
         )
-        self._model.eval()
-        self._model.to(settings.EMBEDDING_DEVICE)
+        model.eval()
+        model.to(settings.EMBEDDING_DEVICE)
+        self._model = model
 
-        data_config = resolve_data_config(self._model.pretrained_cfg)
+        data_config = resolve_data_config(model.pretrained_cfg)  # type: ignore[no-untyped-call]
         self._transform = create_transform(**data_config, is_training=False)
 
     def _extract_sync(self, image_bytes: bytes) -> list[float]:
         """Synchronous embedding extraction. Runs in thread pool."""
+        assert self._model is not None, "Model not loaded — call load_model() first"
+        assert self._transform is not None, "Transform not loaded — call load_model() first"
+
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         tensor = self._transform(image).unsqueeze(0).to(settings.EMBEDDING_DEVICE)
 
         with torch.no_grad():
             output = self._model(tensor)
 
-        embedding = output.squeeze(0).cpu().tolist()
+        embedding: list[float] = output.squeeze(0).cpu().tolist()
         if len(embedding) != EMBEDDING_DIM:
             raise ValueError(f"Expected {EMBEDDING_DIM}-dim embedding, got {len(embedding)}")
         return embedding
@@ -63,7 +67,7 @@ class EmbeddingService:
         coat_color: str | None = None,
         pattern_type: str | None = None,
         limit: int | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Two-stage search: metadata filter -> pgvector cosine similarity.
 
         Returns list of dicts with cat_id, name, similarity, coat_color, pattern_type,

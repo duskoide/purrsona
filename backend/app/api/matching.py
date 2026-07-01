@@ -1,4 +1,4 @@
-import asyncpg
+import asyncpg  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from app.core.error_handlers import error_response
@@ -18,7 +18,7 @@ async def match_endpoint(
     pattern_type: str | None = None,
     user: User = Depends(require_role(UserRole.SIGNED_IN)),
     db: asyncpg.Pool = Depends(get_db),
-) -> dict:
+) -> dict[str, object]:
     """Find cat matches for an uploaded image.
 
     Accepts multipart form with image file and optional metadata filters.
