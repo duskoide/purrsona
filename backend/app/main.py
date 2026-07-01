@@ -1,19 +1,18 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
 from app.core.error_handlers import (
+    generic_exception_handler,
     http_exception_handler,
     validation_exception_handler,
-    generic_exception_handler,
 )
 from app.core.rate_limit import RateLimitMiddleware
-from app.db.pool import init_db_pool, close_db_pool
+from app.db.pool import close_db_pool, init_db_pool
 
 
 @asynccontextmanager

@@ -1,6 +1,6 @@
+from collections.abc import AsyncGenerator
+
 import asyncpg
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from app.core.config import settings
 
@@ -28,10 +28,3 @@ async def close_db_pool() -> None:
 async def get_db() -> AsyncGenerator[asyncpg.Pool, None]:
     pool = await init_db_pool()
     yield pool
-
-
-@asynccontextmanager
-async def get_db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
-    pool = await init_db_pool()
-    async with pool.acquire() as conn:
-        yield conn
