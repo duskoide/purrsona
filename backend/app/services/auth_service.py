@@ -4,6 +4,7 @@ import asyncpg
 from fastapi import HTTPException
 
 from app.core.security import hash_password, verify_password, create_token
+from app.core.error_handlers import error_response
 from app.models.user import User, UserRole
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
@@ -13,46 +14,14 @@ async def register(db: asyncpg.Pool, email: str, password: str) -> tuple[User, s
     email = email.strip().lower()
 
     if not EMAIL_RE.match(email):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": {
-                    "status_code": 422,
-                    "error_type": "validation_error",
-                    "message": "Invalid email format",
-                    "details": [{"field": "email", "message": "Invalid email format"}],
-                }
-            },
-        )
+        raise HTTPException(status_code=422, detail=error_response(422, "Invalid email format", details=[{"field": "email", "message": "Invalid email format"}]))
 
     if len(password) < 8:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": {
-                    "status_code": 422,
-                    "error_type": "validation_error",
-                    "message": "Password must be at least 8 characters",
-                    "details": [
-                        {"field": "password", "message": "Password must be at least 8 characters"}
-                    ],
-                }
-            },
-        )
+        raise HTTPException(status_code=422, detail=error_response(422, "Password must be at least 8 characters", details=[{"field": "password", "message": "Password must be at least 8 characters"}]))
 
     existing = await db.fetchrow("SELECT id FROM users WHERE email = $1", email)
     if existing:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": {
-                    "status_code": 422,
-                    "error_type": "validation_error",
-                    "message": "Email already registered",
-                    "details": [{"field": "email", "message": "Email already registered"}],
-                }
-            },
-        )
+        raise HTTPException(status_code=422, detail=error_response(422, "Email already registered", details=[{"field": "email", "message": "Email already registered"}]))
 
     password_hash = hash_password(password)
     row = await db.fetchrow(
@@ -77,16 +46,7 @@ async def login(db: asyncpg.Pool, email: str, password: str) -> tuple[User, str]
     )
 
     if row is None or not verify_password(password, row["password_hash"]):
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "error": {
-                    "status_code": 401,
-                    "error_type": "authentication_required",
-                    "message": "Invalid email or password",
-                }
-            },
-        )
+        raise HTTPException(status_code=401, detail=error_response(401, "Invalid email or password"))
 
     user = User.from_row(row)
     token = create_token(user.id, user.email, user.role)
@@ -101,16 +61,7 @@ async def submit_verification_request(
         user_id,
     )
     if existing:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": {
-                    "status_code": 422,
-                    "error_type": "validation_error",
-                    "message": "You already have a pending verification request",
-                }
-            },
-        )
+        raise HTTPException(status_code=422, detail=error_response(422, "You already have a pending verification request"))
 
     await db.execute(
         """INSERT INTO verification_requests (user_id, evidence, status)
@@ -141,47 +92,17 @@ async def review_verification_request(
     db: asyncpg.Pool, request_id: str, reviewer_id: str, decision: str
 ) -> dict:
     if decision not in ("approved", "rejected"):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": {
-                    "status_code": 422,
-                    "error_type": "validation_error",
-                    "message": "Decision must be 'approved' or 'rejected'",
-                    "details": [
-                        {"field": "status", "message": "Must be 'approved' or 'rejected'"}
-                    ],
-                }
-            },
-        )
+        raise HTTPException(status_code=422, detail=error_response(422, "Decision must be 'approved' or 'rejected'", details=[{"field": "status", "message": "Must be 'approved' or 'rejected'"}]))
 
     row = await db.fetchrow(
         "SELECT id, user_id, status FROM verification_requests WHERE id = $1",
         request_id,
     )
     if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": {
-                    "status_code": 404,
-                    "error_type": "not_found",
-                    "message": "Verification request not found",
-                }
-            },
-        )
+        raise HTTPException(status_code=404, detail=error_response(404, "Verification request not found"))
 
     if row["status"] != "pending":
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": {
-                    "status_code": 422,
-                    "error_type": "validation_error",
-                    "message": "This request has already been reviewed",
-                }
-            },
-        )
+        raise HTTPException(status_code=422, detail=error_response(422, "This request has already been reviewed"))
 
     updated = await db.fetchrow(
         """UPDATE verification_requests

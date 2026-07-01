@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Response
 
 from app.db.pool import get_db
 from app.models.user import User
+from app.core.config import settings
 from app.core.rbac import require_authenticated
 from app.services.auth_service import register, login, submit_verification_request
 from pydantic import BaseModel
@@ -38,7 +39,7 @@ async def register_endpoint(
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=86400,
+        max_age=settings.JWT_EXPIRY_HOURS * 3600,
     )
 
     return {"user_id": user.id}
@@ -58,7 +59,7 @@ async def login_endpoint(
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=86400,
+        max_age=settings.JWT_EXPIRY_HOURS * 3600,
     )
 
     return {"role": user.role.value}

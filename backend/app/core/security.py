@@ -5,6 +5,7 @@ from passlib.context import CryptContext
 from fastapi import HTTPException
 
 from app.core.config import settings
+from app.core.error_handlers import error_response
 from app.models.user import UserRole
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -36,13 +37,4 @@ def decode_token(token: str) -> dict:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         return payload
     except JWTError:
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "error": {
-                    "status_code": 401,
-                    "error_type": "authentication_required",
-                    "message": "Invalid or expired token",
-                }
-            },
-        )
+        raise HTTPException(status_code=401, detail=error_response(401, "Invalid or expired token"))

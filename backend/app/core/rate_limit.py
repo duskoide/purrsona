@@ -5,6 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from app.core.config import settings
+from app.core.error_handlers import error_response
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -26,16 +27,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ]
 
         if len(self._requests[client_ip]) >= self.requests_per_minute:
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "error": {
-                        "status_code": 429,
-                        "error_type": "rate_limit_exceeded",
-                        "message": "Too many requests. Please try again later.",
-                    }
-                },
-            )
+            raise HTTPException(status_code=429, detail=error_response(429, "Too many requests. Please try again later."))
 
         self._requests[client_ip].append(now)
         return await call_next(request)

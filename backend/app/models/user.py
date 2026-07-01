@@ -27,11 +27,3 @@ class User:
             verified_at=row.get("verified_at"),
         )
 
-
-@dataclass
-class TokenClaims:
-    sub: str
-    email: str
-    role: UserRole
-    iat: int
-    exp: int
