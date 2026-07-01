@@ -17,7 +17,8 @@ from app.db.pool import close_db_pool, init_db_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    await init_db_pool()
+    pool = await init_db_pool()
+    await bootstrap_admin(pool, settings.BOOTSTRAP_ADMIN_EMAIL)
     yield
     await close_db_pool()
 
@@ -41,6 +42,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(auth_router)
+app.include_router(admin_router)
 
 
 @app.get("/health")

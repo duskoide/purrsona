@@ -64,3 +64,21 @@ def _status_to_type(status_code: int) -> str:
         429: "rate_limit_exceeded",
     }
     return mapping.get(status_code, "error")
+
+
+def error_response(
+    status_code: int,
+    message: str,
+    error_type: str | None = None,
+    details: list | None = None,
+) -> dict:
+    body: dict = {
+        "error": {
+            "status_code": status_code,
+            "error_type": error_type or _status_to_type(status_code),
+            "message": message,
+        }
+    }
+    if details:
+        body["error"]["details"] = details
+    return body
