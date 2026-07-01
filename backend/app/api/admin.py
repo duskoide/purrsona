@@ -2,9 +2,9 @@ import asyncpg
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.core.rbac import require_role
 from app.db.pool import get_db
 from app.models.user import User, UserRole
-from app.core.rbac import require_role
 from app.services.auth_service import (
     list_verification_requests,
     review_verification_request,

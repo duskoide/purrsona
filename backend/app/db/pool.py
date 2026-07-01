@@ -1,6 +1,7 @@
-import asyncpg
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+
+import asyncpg
 
 from app.core.config import settings
 

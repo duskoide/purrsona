@@ -1,10 +1,10 @@
+import asyncpg
 from fastapi import Depends, HTTPException, Request
 
-from app.models.user import User, UserRole
-from app.core.security import decode_token
 from app.core.error_handlers import error_response
+from app.core.security import decode_token
 from app.db.pool import get_db
-import asyncpg
+from app.models.user import User, UserRole
 
 
 async def get_current_user(request: Request, db: asyncpg.Pool = Depends(get_db)) -> User | None:
@@ -54,7 +54,10 @@ def require_role(minimum_role: UserRole):
         user: User = Depends(require_authenticated),
     ) -> User:
         if ROLE_HIERARCHY[user.role] < ROLE_HIERARCHY[minimum_role]:
-            raise HTTPException(status_code=403, detail=error_response(403, "Insufficient permissions"))
+            raise HTTPException(
+                status_code=403,
+                detail=error_response(403, "Insufficient permissions"),
+            )
         return user
 
     return dependency

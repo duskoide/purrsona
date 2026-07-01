@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException
 
 from app.core.config import settings
 from app.core.error_handlers import error_response
@@ -20,7 +20,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_token(user_id: str, email: str, role: UserRole) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(hours=settings.JWT_EXPIRY_HOURS)
     claims = {
         "sub": user_id,
@@ -36,5 +36,8 @@ def decode_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         return payload
-    except JWTError:
-        raise HTTPException(status_code=401, detail=error_response(401, "Invalid or expired token"))
+    except JWTError as err:
+        raise HTTPException(
+            status_code=401,
+            detail=error_response(401, "Invalid or expired token"),
+        ) from err
