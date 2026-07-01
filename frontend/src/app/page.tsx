@@ -1,10 +1,28 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/v1/auth/me", { credentials: "include" })
+      .then((res) => {
+        if (res.ok) {
+          router.push("/dashboard");
+        } else {
+          router.push("/auth/login");
+        }
+      })
+      .catch(() => {
+        router.push("/auth/login");
+      });
+  }, [router]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8">
-      <h1 className="text-4xl font-bold text-primary-600">Purrsona</h1>
-      <p className="mt-4 text-lg text-neutral-600">
-        Community cat tracker — coming soon
-      </p>
-    </main>
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-neutral-500">Redirecting...</p>
+    </div>
   );
 }

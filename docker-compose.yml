@@ -6,7 +6,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
       - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
@@ -25,15 +24,23 @@ services:
       - RATE_LIMIT_PER_MINUTE=60
       - JWT_SECRET=dev-secret-key
       - BOOTSTRAP_ADMIN_EMAIL=admin@purrsona.local
+      - S3_ENDPOINT=http://minio:9000
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin
+      - S3_BUCKET=purrsona-images
     depends_on:
-      - db
-      - minio
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations
 
   db:
-    image: postgis/postgis:16-3.4
+    build:
+      context: ./backend
+      dockerfile: db.Dockerfile
     ports:
       - "5432:5432"
     environment:

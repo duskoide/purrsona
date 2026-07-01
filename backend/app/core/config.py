@@ -10,5 +10,20 @@ class Settings(BaseSettings):
     JWT_EXPIRY_HOURS: int = 24
     BOOTSTRAP_ADMIN_EMAIL: str | None = None
 
+    # Environment
+    ENVIRONMENT: str = "development"
+
+    # S3-compatible image storage
+    S3_ENDPOINT: str = "http://localhost:9000"
+    S3_ACCESS_KEY: str = "minioadmin"
+    S3_SECRET_KEY: str = "minioadmin"
+    S3_BUCKET: str = "purrsona-images"
+
+    # Image validation
+    MAX_IMAGE_SIZE_MB: int = 10
+
+    # Coordinate blurring
+    BLUR_RADIUS_METERS: int = 200
+
 
 settings = Settings()

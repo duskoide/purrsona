@@ -10,6 +10,8 @@ from app.services.auth_service import login, register, submit_verification_reque
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+COOKIE_SECURE = settings.ENVIRONMENT == "production"
+
 
 class RegisterRequest(BaseModel):
     email: str
@@ -37,7 +39,7 @@ async def register_endpoint(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_EXPIRY_HOURS * 3600,
     )
@@ -57,7 +59,7 @@ async def login_endpoint(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_EXPIRY_HOURS * 3600,
     )
@@ -79,3 +81,10 @@ async def verify_request_endpoint(
 async def logout_endpoint(response: Response) -> dict:
     response.delete_cookie("access_token")
     return {"message": "Logged out"}
+
+
+@router.get("/me")
+async def me_endpoint(
+    user: User = Depends(require_authenticated),
+) -> dict:
+    return {"id": user.id, "email": user.email, "role": user.role.value}
