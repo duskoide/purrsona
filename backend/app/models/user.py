@@ -18,7 +18,7 @@ class User:
     verified_at: datetime | None = None
 
     @classmethod
-    def from_row(cls, row: dict) -> "User":
+    def from_row(cls, row) -> "User":
         return cls(
             id=str(row["id"]),
             email=row["email"],

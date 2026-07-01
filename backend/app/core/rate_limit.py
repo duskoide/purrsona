@@ -26,8 +26,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._requests[client_ip] = [
             t for t in self._requests[client_ip] if t > window_start
         ]
+        if not self._requests[client_ip]:
+            del self._requests[client_ip]
 
-        if len(self._requests[client_ip]) >= self.requests_per_minute:
+        if len(self._requests.get(client_ip, [])) >= self.requests_per_minute:
             raise HTTPException(
                 status_code=429,
                 detail=error_response(429, "Too many requests. Please try again later."),
