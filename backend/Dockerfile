@@ -9,5 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY . .
 RUN pip install --no-cache-dir .
 
+# Pre-download MegaDescriptor model weights at build time
+RUN python -c "from timm import create_model; create_model('hf-hub:BVRA/MegaDescriptor-T-224', pretrained=True)"
+
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
