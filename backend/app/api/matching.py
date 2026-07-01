@@ -8,6 +8,15 @@ from app.models.user import User, UserRole
 from app.services.embedding_service import embedding_service
 from app.services.image_service import validate_image
 
+VALID_COAT_COLORS = {
+    "black", "white", "orange", "gray", "brown",
+    "cream", "mixed_black_white", "mixed_orange_white", "other",
+}
+VALID_PATTERN_TYPES = {
+    "tabby", "calico", "tuxedo", "solid", "bicolor",
+    "tortoiseshell", "pointed", "other",
+}
+
 router = APIRouter(prefix="/api/v1/matching", tags=["matching"])
 
 
@@ -24,6 +33,23 @@ async def match_endpoint(
     Accepts multipart form with image file and optional metadata filters.
     Returns up to 3 candidates ranked by similarity.
     """
+    param_errors = []
+    if coat_color is not None and coat_color not in VALID_COAT_COLORS:
+        valid = ", ".join(sorted(VALID_COAT_COLORS))
+        param_errors.append(
+            {"field": "coat_color", "message": f"Invalid value. Must be one of: {valid}"}
+        )
+    if pattern_type is not None and pattern_type not in VALID_PATTERN_TYPES:
+        valid = ", ".join(sorted(VALID_PATTERN_TYPES))
+        param_errors.append(
+            {"field": "pattern_type", "message": f"Invalid value. Must be one of: {valid}"}
+        )
+    if param_errors:
+        raise HTTPException(
+            status_code=422,
+            detail=error_response(422, "Invalid filter parameters", details=param_errors),
+        )
+
     contents = await image.read()
     header = contents[:12]
 

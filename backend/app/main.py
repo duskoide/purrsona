@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -25,7 +26,7 @@ from app.services.embedding_service import embedding_service
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     pool = await init_db_pool()
     await bootstrap_admin(pool, settings.BOOTSTRAP_ADMIN_EMAIL)
-    embedding_service.load_model()
+    await asyncio.to_thread(embedding_service.load_model)
     yield
     await close_db_pool()
 
