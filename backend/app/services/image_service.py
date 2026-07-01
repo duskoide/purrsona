@@ -1,15 +1,15 @@
 import uuid
-from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 import boto3
 from botocore.config import Config
 from fastapi import HTTPException, UploadFile
 
 from app.core.config import settings
+from app.core.error_handlers import error_response
 
 
-class ImageFormat(str, Enum):
+class ImageFormat(StrEnum):
     JPEG = "image/jpeg"
     PNG = "image/png"
     WEBP = "image/webp"
@@ -18,32 +18,51 @@ class ImageFormat(str, Enum):
 MAGIC_BYTES: dict[bytes, ImageFormat] = {
     b"\xff\xd8\xff": ImageFormat.JPEG,
     b"\x89PNG": ImageFormat.PNG,
-    b"RIFF": ImageFormat.WEBP,  # WebP starts with RIFF
+    b"RIFF": ImageFormat.WEBP,
 }
 
 MAX_IMAGE_SIZE_BYTES = settings.MAX_IMAGE_SIZE_MB * 1024 * 1024
 
+EXT_MAP = {
+    ImageFormat.JPEG: ".jpg",
+    ImageFormat.PNG: ".png",
+    ImageFormat.WEBP: ".webp",
+}
 
-@dataclass
-class ValidationResult:
-    valid: bool
-    errors: list[str]
+_s3_client = None
+
+
+def _get_s3():
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client(
+            "s3",
+            endpoint_url=settings.S3_ENDPOINT,
+            aws_access_key_id=settings.S3_ACCESS_KEY,
+            aws_secret_access_key=settings.S3_SECRET_KEY,
+            config=Config(signature_version="s3v4"),
+            region_name="us-east-1",
+        )
+    return _s3_client
 
 
 def detect_format(header: bytes) -> ImageFormat | None:
     """Detect image format from magic bytes."""
+    if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+        return ImageFormat.WEBP
     for magic, fmt in MAGIC_BYTES.items():
+        if magic == b"RIFF":
+            continue
         if header[: len(magic)] == magic:
             return fmt
     return None
 
 
-def validate_image(content_type: str | None, size_bytes: int, header: bytes) -> ValidationResult:
-    """Validate image format (by magic bytes) and size."""
+def validate_image(content_type: str | None, size_bytes: int, header: bytes) -> list[str]:
+    """Validate image format (by magic bytes) and size. Returns list of errors."""
     errors = []
 
-    fmt = detect_format(header)
-    if fmt is None:
+    if detect_format(header) is None:
         errors.append(
             f"Unsupported image format. Supported: JPEG, PNG, WebP. "
             f"Content-Type was '{content_type}' but magic bytes did not match."
@@ -54,7 +73,7 @@ def validate_image(content_type: str | None, size_bytes: int, header: bytes) -> 
             f"File size {size_bytes} bytes exceeds maximum of {settings.MAX_IMAGE_SIZE_MB} MB"
         )
 
-    return ValidationResult(valid=len(errors) == 0, errors=errors)
+    return errors
 
 
 async def upload_image(file: UploadFile) -> str:
@@ -65,52 +84,27 @@ async def upload_image(file: UploadFile) -> str:
     contents = await file.read()
     size_bytes = len(contents)
 
-    header = contents[:8]
-    result = validate_image(file.content_type, size_bytes, header)
+    header = contents[:12]
+    errors = validate_image(file.content_type, size_bytes, header)
 
-    if not result.valid:
+    if errors:
         raise HTTPException(
             status_code=422,
-            detail={
-                "error": {
-                    "status_code": 422,
-                    "error_type": "validation_error",
-                    "message": "Image validation failed",
-                    "details": [{"field": "photo", "message": e} for e in result.errors],
-                }
-            },
+            detail=error_response(
+                422, "Image validation failed",
+                details=[{"field": "photo", "message": e} for e in errors],
+            ),
         )
 
     fmt = detect_format(header)
-    ext_map = {
-        ImageFormat.JPEG: ".jpg",
-        ImageFormat.PNG: ".png",
-        ImageFormat.WEBP: ".webp",
-    }
-    ext = ext_map[fmt]
-    key = f"photos/{uuid.uuid4().hex}{ext}"
+    key = f"photos/{uuid.uuid4().hex}{EXT_MAP[fmt]}"
 
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=settings.S3_ENDPOINT,
-        aws_access_key_id=settings.S3_ACCESS_KEY,
-        aws_secret_access_key=settings.S3_SECRET_KEY,
-        config=Config(signature_version="s3v4"),
-        region_name="us-east-1",
-    )
-
-    content_type_map = {
-        ImageFormat.JPEG: "image/jpeg",
-        ImageFormat.PNG: "image/png",
-        ImageFormat.WEBP: "image/webp",
-    }
-
+    s3 = _get_s3()
     s3.put_object(
         Bucket=settings.S3_BUCKET,
         Key=key,
         Body=contents,
-        ContentType=content_type_map[fmt],
+        ContentType=fmt.value,
     )
 
-    url = f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET}/{key}"
-    return url
+    return f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET}/{key}"
