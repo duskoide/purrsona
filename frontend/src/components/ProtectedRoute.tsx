@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { PixelSpinner } from "@/components/PixelSpinner";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuthContext();
@@ -17,7 +18,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-neutral-500">Loading...</p>
+        <PixelSpinner label="LOADING PLAYER DATA..." />
       </div>
     );
   }

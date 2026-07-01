@@ -9,19 +9,31 @@ const statusStyles: Record<Status, string> = {
   rejected: "bg-error-main text-white border-2 border-neutral-900",
 };
 
+const statusLabels: Record<Status, string> = {
+  verified: "VERIFIED",
+  signed_in: "SIGNED IN",
+  public: "PUBLIC",
+  pending: "PENDING",
+  approved: "APPROVED",
+  rejected: "REJECTED",
+};
+
 interface StatusBadgeProps {
   status: string;
   className?: string;
 }
 
 export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
-  const style = statusStyles[status as Status] || "bg-neutral-200 text-neutral-900 border-2 border-neutral-900";
+  const key = status as Status;
+  const style = statusStyles[key] || "bg-neutral-200 text-neutral-900 border-2 border-neutral-900";
+  const label = statusLabels[key] || status.toUpperCase();
 
   return (
     <span
       className={`inline-block px-3 py-0.5 text-sm font-bold ${style} ${className}`}
+      role="status"
     >
-      {status}
+      {label}
     </span>
   );
 }

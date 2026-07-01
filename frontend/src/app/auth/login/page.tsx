@@ -32,7 +32,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-      <Card rainbow className="w-full max-w-md">
+      <Card variant="featured" className="w-full max-w-md">
         <h1 className="text-2xl font-bold text-center mb-6 text-primary-500">
           PLAYER LOGIN
         </h1>

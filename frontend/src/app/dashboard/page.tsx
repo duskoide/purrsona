@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/Button";
-import { Card, CardTitle } from "@/components/Card";
+import { Card, CardTitle, CardScore } from "@/components/Card";
 import { StatusBadge } from "@/components/StatusBadge";
+import { EmptyState } from "@/components/EmptyState";
+import { Modal } from "@/components/Modal";
 
 export default function DashboardPage() {
   return (
@@ -20,6 +22,7 @@ function DashboardContent() {
   const [verifyMessage, setVerifyMessage] = useState("");
   const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
   const [adminError, setAdminError] = useState("");
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   const handleVerifyRequest = async () => {
     setVerifyMessage("");
@@ -33,6 +36,7 @@ function DashboardContent() {
     });
     if (res.ok) {
       setVerifyMessage("Verification request submitted!");
+      setShowVerifyModal(false);
     } else {
       const err = await res.json();
       setVerifyMessage(err.error?.message || "Failed to submit");
@@ -75,14 +79,24 @@ function DashboardContent() {
           PLAYER DASHBOARD
         </h1>
 
-        <Card className="mb-6">
+        {/* Player profile - score card */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <Card variant="score">
+            <CardScore value={user?.role?.toUpperCase() || "PUBLIC"} label="RANK" />
+          </Card>
+          <Card variant="score">
+            <CardScore value="1" label="LEVEL" />
+          </Card>
+        </div>
+
+        <Card variant="featured" className="mb-6">
           <CardTitle>YOUR PROFILE</CardTitle>
           <div className="space-y-2">
             <p className="font-bold">
-              EMAIL: <span className="font-normal">{user?.email}</span>
+              EMAIL: <span className="font-normal text-base">{user?.email}</span>
             </p>
-            <p className="font-bold">
-              ROLE: <StatusBadge status={user?.role || "public"} />
+            <p className="font-bold flex items-center gap-2">
+              STATUS: <StatusBadge status={user?.role || "public"} />
             </p>
           </div>
         </Card>
@@ -100,7 +114,7 @@ function DashboardContent() {
                 <p className="text-sm text-neutral-500 mb-3">
                   As a signed-in player, you can request verified status.
                 </p>
-                <Button variant="secondary" size="sm" onClick={handleVerifyRequest}>
+                <Button variant="secondary" size="sm" onClick={() => setShowVerifyModal(true)}>
                   SUBMIT REQUEST
                 </Button>
                 {verifyMessage && (
@@ -123,7 +137,7 @@ function DashboardContent() {
                 {adminError && (
                   <p className="mt-2 text-sm text-error-main font-bold">{adminError}</p>
                 )}
-                {verificationRequests.length > 0 && (
+                {verificationRequests.length > 0 ? (
                   <div className="mt-3 space-y-2">
                     {verificationRequests.map((req) => (
                       <div
@@ -144,6 +158,12 @@ function DashboardContent() {
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <EmptyState
+                    title="No pending requests."
+                    description="All caught up."
+                    className="mt-3"
+                  />
                 )}
               </div>
             )}
@@ -180,7 +200,8 @@ function DashboardContent() {
               <a
                 href="http://localhost:8000/docs"
                 target="_blank"
-                className="text-primary-500 font-bold hover:underline"
+                className="text-primary-500 font-bold hover:underline
+                  focus-visible:outline-3 focus-visible:outline-primary-500 focus-visible:outline-offset-2"
               >
                 API DOCS (SWAGGER)
               </a>
@@ -189,7 +210,8 @@ function DashboardContent() {
               <a
                 href="http://localhost:8000/health"
                 target="_blank"
-                className="text-primary-500 font-bold hover:underline"
+                className="text-primary-500 font-bold hover:underline
+                  focus-visible:outline-3 focus-visible:outline-primary-500 focus-visible:outline-offset-2"
               >
                 HEALTH CHECK
               </a>
@@ -198,13 +220,33 @@ function DashboardContent() {
               <a
                 href="http://localhost:9001"
                 target="_blank"
-                className="text-primary-500 font-bold hover:underline"
+                className="text-primary-500 font-bold hover:underline
+                  focus-visible:outline-3 focus-visible:outline-primary-500 focus-visible:outline-offset-2"
               >
                 MINIO CONSOLE (minioadmin/minioadmin)
               </a>
             </p>
           </div>
         </Card>
+
+        {/* Verification confirmation modal */}
+        <Modal
+          open={showVerifyModal}
+          onClose={() => setShowVerifyModal(false)}
+          title="SUBMIT VERIFICATION?"
+        >
+          <p className="text-sm text-neutral-600 mb-4">
+            Request verified status to unlock TNR updates and cat profile editing.
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setShowVerifyModal(false)}>
+              CANCEL
+            </Button>
+            <Button size="sm" onClick={handleVerifyRequest}>
+              CONFIRM
+            </Button>
+          </div>
+        </Modal>
       </div>
     </div>
   );
