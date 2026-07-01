@@ -5,7 +5,6 @@ import io
 from typing import TYPE_CHECKING
 
 import torch
-from huggingface_hub import hf_hub_download
 from PIL import Image
 from timm import create_model
 from timm.data import resolve_data_config
@@ -49,7 +48,8 @@ class EmbeddingService:
             output = self._model(tensor)
 
         embedding = output.squeeze(0).cpu().tolist()
-        assert len(embedding) == EMBEDDING_DIM
+        if len(embedding) != EMBEDDING_DIM:
+            raise ValueError(f"Expected {EMBEDDING_DIM}-dim embedding, got {len(embedding)}")
         return embedding
 
     async def extract_embedding(self, image_bytes: bytes) -> list[float]:
