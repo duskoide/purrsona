@@ -71,43 +71,40 @@ function DashboardContent() {
   return (
     <div className="min-h-screen bg-neutral-50 p-8">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+        <h1 className="text-3xl font-bold mb-8 text-primary-500">
+          PLAYER DASHBOARD
+        </h1>
 
         <Card className="mb-6">
-          <CardTitle>Your Profile</CardTitle>
+          <CardTitle>YOUR PROFILE</CardTitle>
           <div className="space-y-2">
-            <p>
-              <span className="font-medium">Email:</span> {user?.email}
+            <p className="font-bold">
+              EMAIL: <span className="font-normal">{user?.email}</span>
             </p>
-            <p>
-              <span className="font-medium">Role:</span>{" "}
-              <StatusBadge status={user?.role || "public"} />
+            <p className="font-bold">
+              ROLE: <StatusBadge status={user?.role || "public"} />
             </p>
           </div>
         </Card>
 
         <Card className="mb-6">
-          <CardTitle>RBAC Test</CardTitle>
+          <CardTitle>RBAC TEST</CardTitle>
           <p className="text-sm text-neutral-600 mb-4">
-            Your current role is <strong>{user?.role}</strong>.
+            Current role: <strong>{user?.role}</strong>
           </p>
 
           <div className="space-y-4">
             {user?.role === "signed_in" && (
-              <div className="p-4 border border-neutral-200 rounded-md">
-                <h3 className="font-medium mb-2">Request Verification</h3>
+              <div className="p-4 border-2 border-neutral-900">
+                <h3 className="font-bold mb-2">REQUEST VERIFICATION</h3>
                 <p className="text-sm text-neutral-500 mb-3">
-                  As a signed-in user, you can request to become verified.
+                  As a signed-in player, you can request verified status.
                 </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleVerifyRequest}
-                >
-                  Submit Verification Request
+                <Button variant="secondary" size="sm" onClick={handleVerifyRequest}>
+                  SUBMIT REQUEST
                 </Button>
                 {verifyMessage && (
-                  <p className="mt-2 text-sm text-secondary-700">
+                  <p className="mt-2 text-sm text-success-main font-bold">
                     {verifyMessage}
                   </p>
                 )}
@@ -115,40 +112,34 @@ function DashboardContent() {
             )}
 
             {user?.role === "verified" && (
-              <div className="p-4 border border-neutral-200 rounded-md">
-                <h3 className="font-medium mb-2">
-                  Admin: Verification Requests
-                </h3>
+              <div className="p-4 border-2 border-neutral-900">
+                <h3 className="font-bold mb-2">ADMIN: VERIFICATION REQUESTS</h3>
                 <p className="text-sm text-neutral-500 mb-3">
-                  As a verified user, you can review verification requests.
+                  As a verified player, you can review requests.
                 </p>
                 <Button size="sm" onClick={handleListVerificationRequests}>
-                  Load Pending Requests
+                  LOAD PENDING
                 </Button>
                 {adminError && (
-                  <p className="mt-2 text-sm text-error-dark">{adminError}</p>
+                  <p className="mt-2 text-sm text-error-main font-bold">{adminError}</p>
                 )}
                 {verificationRequests.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {verificationRequests.map((req) => (
                       <div
                         key={req.id}
-                        className="p-3 bg-neutral-50 rounded-md flex justify-between items-center"
+                        className="p-3 bg-neutral-50 border-2 border-neutral-900 flex justify-between items-center"
                       >
                         <div>
-                          <p className="text-sm font-medium">
-                            User: {req.user_id}
-                          </p>
-                          <p className="text-xs text-neutral-500">
-                            {req.evidence}
-                          </p>
+                          <p className="text-sm font-bold">PLAYER: {req.user_id}</p>
+                          <p className="text-xs text-neutral-500">{req.evidence}</p>
                         </div>
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={() => handleApprove(req.id)}
                         >
-                          Approve
+                          APPROVE
                         </Button>
                       </div>
                     ))}
@@ -158,23 +149,23 @@ function DashboardContent() {
             )}
 
             {user?.role !== "verified" && (
-              <div className="p-4 border border-error-light rounded-md bg-error-light/30">
-                <h3 className="font-medium mb-2 text-error-dark">
-                  Try Admin Endpoint
+              <div className="p-4 border-2 border-error-main bg-error-light">
+                <h3 className="font-bold mb-2 text-error-main">
+                  TRY ADMIN ENDPOINT
                 </h3>
                 <p className="text-sm text-neutral-500 mb-3">
-                  As a {user?.role} user, you should get 403 Forbidden.
+                  As a {user?.role} player, you should get 403 FORBIDDEN.
                 </p>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleListVerificationRequests}
                 >
-                  Try GET /admin/verification-requests
+                  TRY /admin/verification-requests
                 </Button>
                 {adminError && (
-                  <p className="mt-2 text-sm text-error-dark">
-                    Got: {adminError}
+                  <p className="mt-2 text-sm text-error-main font-bold">
+                    GOT: {adminError}
                   </p>
                 )}
               </div>
@@ -183,33 +174,33 @@ function DashboardContent() {
         </Card>
 
         <Card>
-          <CardTitle>Quick Links</CardTitle>
+          <CardTitle>QUICK LINKS</CardTitle>
           <div className="space-y-2 text-sm">
             <p>
               <a
                 href="http://localhost:8000/docs"
                 target="_blank"
-                className="text-primary-600 hover:underline"
+                className="text-primary-500 font-bold hover:underline"
               >
-                API Docs (Swagger UI)
+                API DOCS (SWAGGER)
               </a>
             </p>
             <p>
               <a
                 href="http://localhost:8000/health"
                 target="_blank"
-                className="text-primary-600 hover:underline"
+                className="text-primary-500 font-bold hover:underline"
               >
-                Health Check
+                HEALTH CHECK
               </a>
             </p>
             <p>
               <a
                 href="http://localhost:9001"
                 target="_blank"
-                className="text-primary-600 hover:underline"
+                className="text-primary-500 font-bold hover:underline"
               >
-                MinIO Console (minioadmin/minioadmin)
+                MINIO CONSOLE (minioadmin/minioadmin)
               </a>
             </p>
           </div>

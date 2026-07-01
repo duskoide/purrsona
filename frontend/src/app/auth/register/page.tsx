@@ -39,27 +39,29 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-      <Card className="w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-6">Create Account</h1>
+      <Card rainbow className="w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center mb-6 text-primary-500">
+          CREATE PLAYER
+        </h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-error-light text-error-dark rounded-md text-sm">
+          <div className="mb-4 p-3 bg-error-light text-error-main border-2 border-error-main text-sm font-bold">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <TextInput
-            label="Email"
+            label="EMAIL"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="you@example.com"
+            placeholder="player@purrsona.local"
           />
 
           <TextInput
-            label="Password"
+            label="PASSWORD"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -69,7 +71,7 @@ export default function RegisterPage() {
           />
 
           <TextInput
-            label="Confirm Password"
+            label="CONFIRM PASSWORD"
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -79,14 +81,14 @@ export default function RegisterPage() {
           />
 
           <Button type="submit" loading={loading} className="w-full">
-            Register
+            CREATE ACCOUNT
           </Button>
         </form>
 
         <p className="mt-4 text-center text-sm text-neutral-600">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="text-primary-600 hover:underline">
-            Login
+          Already a player?{" "}
+          <Link href="/auth/login" className="text-primary-500 font-bold hover:underline">
+            LOGIN
           </Link>
         </p>
       </Card>

@@ -1,9 +1,30 @@
+@import url("https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-neutral-50 text-neutral-900 antialiased font-sans;
+    @apply bg-neutral-0 text-neutral-900 antialiased font-sans text-base;
+  }
+
+  :focus-visible {
+    outline: 3px solid #FFDA14;
+    outline-offset: 3px;
+  }
+}
+
+@layer utilities {
+  .arcade-press {
+    transition: transform 80ms ease, box-shadow 80ms ease;
+  }
+  .arcade-press:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0 #111827;
+  }
+  .arcade-press:active {
+    transform: translate(4px, 4px);
+    box-shadow: 2px 2px 0 #111827;
   }
 }

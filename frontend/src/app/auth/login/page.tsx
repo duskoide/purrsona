@@ -32,29 +32,29 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-      <Card className="w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-6">
-          Login to Purrsona
+      <Card rainbow className="w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center mb-6 text-primary-500">
+          PLAYER LOGIN
         </h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-error-light text-error-dark rounded-md text-sm">
+          <div className="mb-4 p-3 bg-error-light text-error-main border-2 border-error-main text-sm font-bold">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <TextInput
-            label="Email"
+            label="EMAIL"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="you@example.com"
+            placeholder="player@purrsona.local"
           />
 
           <TextInput
-            label="Password"
+            label="PASSWORD"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -64,26 +64,24 @@ export default function LoginPage() {
           />
 
           <Button type="submit" loading={loading} className="w-full">
-            Login
+            START GAME
           </Button>
         </form>
 
         <p className="mt-4 text-center text-sm text-neutral-600">
-          Don&apos;t have an account?{" "}
+          No account?{" "}
           <Link
             href="/auth/register"
-            className="text-primary-600 hover:underline"
+            className="text-primary-500 font-bold hover:underline"
           >
-            Register
+            CREATE PLAYER
           </Link>
         </p>
 
-        <div className="mt-6 p-3 bg-neutral-100 rounded-md text-xs text-neutral-500">
-          <p className="font-semibold mb-1">
-            Test accounts (password: password123)
-          </p>
-          <p>admin@purrsona.local — verified role</p>
-          <p>user@purrsona.local — signed_in role</p>
+        <div className="mt-6 p-3 bg-secondary-400 border-2 border-neutral-900 text-xs text-neutral-900 font-bold">
+          <p className="mb-1">TEST ACCOUNTS (password: password123)</p>
+          <p>admin@purrsona.local — VERIFIED</p>
+          <p>user@purrsona.local — SIGNED IN</p>
         </div>
       </Card>
     </div>

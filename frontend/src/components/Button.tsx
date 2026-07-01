@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes, forwardRef } from "react";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -11,17 +11,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 focus:ring-primary-500",
+    "bg-primary-500 text-white border-2 border-neutral-900 shadow-press-md hover:shadow-press-lg hover:-translate-x-0.5 hover:-translate-y-0.5 active:shadow-sm active:translate-x-1 active:translate-y-1",
   secondary:
-    "border border-primary-500 text-primary-600 hover:bg-primary-50 active:bg-primary-100 focus:ring-primary-500",
+    "bg-secondary-400 text-neutral-900 border-2 border-neutral-900 shadow-press-md hover:shadow-press-lg hover:-translate-x-0.5 hover:-translate-y-0.5 active:shadow-sm active:translate-x-1 active:translate-y-1",
   ghost:
-    "text-primary-600 hover:bg-neutral-100 active:bg-neutral-200 focus:ring-primary-500",
+    "bg-transparent text-primary-500 border-2 border-primary-500 hover:bg-primary-50 active:bg-primary-100",
+  destructive:
+    "bg-error-main text-white border-2 border-neutral-900 shadow-press-md hover:shadow-press-lg hover:-translate-x-0.5 hover:-translate-y-0.5 active:shadow-sm active:translate-x-1 active:translate-y-1",
 };
 
 const sizeStyles: Record<Size, string> = {
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-base",
-  lg: "px-6 py-3 text-lg",
+  sm: "px-4 py-1.5 text-sm",
+  md: "px-6 py-2 text-base",
+  lg: "px-8 py-3 text-lg",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -41,32 +43,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center font-semibold rounded-md
-          transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2
-          disabled:opacity-50 disabled:pointer-events-none
+        className={`inline-flex items-center justify-center font-bold rounded-full
+          transition-all duration-100 ease-out
+          disabled:opacity-50 disabled:pointer-events-none disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0
           ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
         {...props}
       >
         {loading && (
-          <svg
-            className="animate-spin -ml-1 mr-2 h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
+          <span className="mr-2 inline-block animate-pulse">...</span>
         )}
         {children}
       </button>
