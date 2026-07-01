@@ -3,9 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuthContext } from "@/contexts/AuthContext";
+import { Button } from "@/components/Button";
+import { TextInput } from "@/components/TextInput";
+import { Card } from "@/components/Card";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register } = useAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,20 +27,8 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-
     try {
-      const res = await fetch("/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error?.message || "Registration failed");
-      }
-
+      await register(email, password);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);
@@ -46,79 +39,59 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-center mb-6">Create Account</h1>
+      <Card variant="featured" className="w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center mb-6 text-primary-500">
+          CREATE PLAYER
+        </h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-error-light text-error-dark rounded-md text-sm">
+          <div className="mb-4 p-3 bg-error-light text-error-main border-2 border-error-main text-sm font-bold">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="you@example.com"
-            />
-          </div>
+          <TextInput
+            label="EMAIL"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="player@purrsona.local"
+          />
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-neutral-700 mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Min 8 characters"
-            />
-          </div>
+          <TextInput
+            label="PASSWORD"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            placeholder="Min 8 characters"
+          />
 
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-700 mb-1">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Repeat password"
-            />
-          </div>
+          <TextInput
+            label="CONFIRM PASSWORD"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            minLength={8}
+            placeholder="Repeat password"
+          />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 px-4 bg-primary-500 text-white font-semibold rounded-md hover:bg-primary-600 disabled:opacity-50"
-          >
-            {loading ? "Creating account..." : "Register"}
-          </button>
+          <Button type="submit" loading={loading} className="w-full">
+            CREATE ACCOUNT
+          </Button>
         </form>
 
         <p className="mt-4 text-center text-sm text-neutral-600">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="text-primary-600 hover:underline">
-            Login
+          Already a player?{" "}
+          <Link href="/auth/login" className="text-primary-500 font-bold hover:underline">
+            LOGIN
           </Link>
         </p>
-      </div>
+      </Card>
     </div>
   );
 }

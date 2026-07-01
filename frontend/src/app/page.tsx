@@ -2,23 +2,17 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 export default function Home() {
+  const { user, isLoading } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/v1/auth/me", { credentials: "include" })
-      .then((res) => {
-        if (res.ok) {
-          router.push("/dashboard");
-        } else {
-          router.push("/auth/login");
-        }
-      })
-      .catch(() => {
-        router.push("/auth/login");
-      });
-  }, [router]);
+    if (!isLoading) {
+      router.push(user ? "/dashboard" : "/auth/login");
+    }
+  }, [user, isLoading, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

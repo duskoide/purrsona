@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "@/styles/globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { NavigationBar } from "@/components/NavigationBar";
 
 export const metadata: Metadata = {
   title: "Purrsona — Community Cat Tracker",
@@ -13,7 +15,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <NavigationBar />
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }

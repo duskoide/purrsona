@@ -1,9 +1,83 @@
+@import url("https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-neutral-50 text-neutral-900 antialiased font-sans;
+    @apply bg-neutral-0 text-neutral-900 antialiased font-sans text-base;
+  }
+
+  /* Yellow focus ring on blue/dark backgrounds */
+  :focus-visible {
+    outline: 3px solid #ef8c38;
+    outline-offset: 3px;
+  }
+
+  /* Blue focus ring on light backgrounds */
+  .focus-ring-light:focus-visible {
+    outline: 3px solid #e8731a;
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  /* Pixel spinner animation */
+  @keyframes pixel-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .pixel-spinner {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .pixel-spinner-dot {
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+    animation: pixel-blink 0.8s ease-in-out infinite;
+  }
+
+  .pixel-spinner-dot:nth-child(2) { animation-delay: 0.15s; }
+  .pixel-spinner-dot:nth-child(3) { animation-delay: 0.3s; }
+}
+
+@layer utilities {
+  /* Press animation with reduced-motion fallback */
+  .arcade-press {
+    transition: transform 80ms ease, box-shadow 80ms ease;
+  }
+  .arcade-press:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0 #272220;
+  }
+  .arcade-press:active {
+    transform: translate(4px, 4px);
+    box-shadow: 2px 2px 0 #272220;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .arcade-press {
+      transition: none;
+    }
+    .arcade-press:hover {
+      transform: none;
+      box-shadow: 8px 8px 0 #272220;
+    }
+    .arcade-press:active {
+      transform: none;
+      box-shadow: 2px 2px 0 #272220;
+      background-blend-mode: multiply;
+    }
+    .pixel-spinner-dot {
+      animation: none;
+      opacity: 0.6;
+    }
+    .pixel-spinner-dot:nth-child(2) { opacity: 0.8; }
+    .pixel-spinner-dot:nth-child(3) { opacity: 1; }
   }
 }
