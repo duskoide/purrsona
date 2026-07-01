@@ -18,7 +18,6 @@ class ImageFormat(StrEnum):
 MAGIC_BYTES: dict[bytes, ImageFormat] = {
     b"\xff\xd8\xff": ImageFormat.JPEG,
     b"\x89PNG": ImageFormat.PNG,
-    b"RIFF": ImageFormat.WEBP,
 }
 
 MAX_IMAGE_SIZE_BYTES = settings.MAX_IMAGE_SIZE_MB * 1024 * 1024
@@ -51,8 +50,6 @@ def detect_format(header: bytes) -> ImageFormat | None:
     if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
         return ImageFormat.WEBP
     for magic, fmt in MAGIC_BYTES.items():
-        if magic == b"RIFF":
-            continue
         if header[: len(magic)] == magic:
             return fmt
     return None
