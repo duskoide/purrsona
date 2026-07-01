@@ -21,14 +21,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://purrsona:purrsona@db:5432/purrsona
-      - S3_ENDPOINT=http://minio:9000
-      - S3_ACCESS_KEY=minioadmin
-      - S3_SECRET_KEY=minioadmin
-      - S3_BUCKET=purrsona-images
-      - MEGADESCRIPTOR_MODEL=hf-hub:BVRA/MegaDescriptor-T-224
-      - JWT_SECRET=dev-secret-key
       - RATE_LIMIT_PER_MINUTE=60
-      - BOOTSTRAP_ADMIN_EMAIL=admin@purrsona.local
     depends_on:
       - db
       - minio
@@ -46,9 +39,8 @@ services:
       - POSTGRES_DB=purrsona
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backend/migrations/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
-      - ./backend/migrations/001_initial.sql:/docker-entrypoint-initdb.d/02-schema.sql
-      - ./backend/migrations/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql
+      - ./backend/migrations/001_initial.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/migrations/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U purrsona"]
       interval: 5s

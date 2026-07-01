@@ -1,5 +1,4 @@
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 
 import asyncpg
 
@@ -29,10 +28,3 @@ async def close_db_pool() -> None:
 async def get_db() -> AsyncGenerator[asyncpg.Pool, None]:
     pool = await init_db_pool()
     yield pool
-
-
-@asynccontextmanager
-async def get_db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
-    pool = await init_db_pool()
-    async with pool.acquire() as conn:
-        yield conn

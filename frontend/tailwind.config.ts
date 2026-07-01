@@ -3,7 +3,6 @@ import { colors, spacing, borderRadius, shadows } from "./src/styles/tokens";
 
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
-  darkMode: "class",
   theme: {
     extend: {
       colors: {
