@@ -7,7 +7,6 @@ from uuid import uuid4
 import asyncpg
 
 from app.core.error_handlers import error_response
-from app.core.rbac import require_role
 from app.services.coordinate_service import blur_coordinate
 from app.services.embedding_service import embedding_service
 from app.services.image_service import upload_image
@@ -49,6 +48,7 @@ async def initiate_sighting(
             ),
         )
 
+    await image.seek(0)
     photo_url = await upload_image(image)
     blurred_lat, blurred_lng = blur_coordinate(latitude, longitude)
     embedding = await embedding_service.extract_embedding(contents)
@@ -201,6 +201,7 @@ async def _create_cat_from_draft(
     cat_id = str(uuid4())
     embedding = draft["embedding"]
     embedding_str = f"[{','.join(str(x) for x in embedding)}]" if embedding else None
+    ear_tip_status = draft["ear_tip_status"] if draft["ear_tip_status"] is not None else False
 
     await db.execute(
         """
@@ -216,7 +217,7 @@ async def _create_cat_from_draft(
         draft["coat_color"],
         draft["pattern_type"],
         draft["notable_markings"],
-        draft["ear_tip_status"],
+        ear_tip_status,
         draft["body_size"],
         embedding_str,
         user_id,
