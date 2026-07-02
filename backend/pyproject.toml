@@ -30,6 +30,9 @@ dev = [
     "mypy>=1.10,<2",
 ]
 
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
