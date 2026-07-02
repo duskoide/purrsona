@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 interface MapContainerProps {
   center: [number, number];
   zoom: number;
+  onClick?: (lat: number, lng: number) => void;
   onBoundsChange?: (bounds: {
     min_lat: number;
     min_lng: number;
@@ -16,7 +17,7 @@ interface MapContainerProps {
   children?: React.ReactNode;
 }
 
-export function MapContainer({ center, zoom, onBoundsChange }: MapContainerProps) {
+export function MapContainer({ center, zoom, onClick, onBoundsChange }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
 
@@ -29,6 +30,12 @@ export function MapContainer({ center, zoom, onBoundsChange }: MapContainerProps
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
+
+    if (onClick) {
+      map.on("click", (e: L.LeafletMouseEvent) => {
+        onClick(e.latlng.lat, e.latlng.lng);
+      });
+    }
 
     if (onBoundsChange) {
       const updateBounds = () => {
