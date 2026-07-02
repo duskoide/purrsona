@@ -104,7 +104,6 @@ async def create_tnr_record(
     }
 
 
-VALID_CONTENT_TYPES = {"sighting", "feeding_spot", "tnr_record"}
 VALID_REASONS = {"inaccurate", "abusive", "unsafe", "other"}
 
 
@@ -131,7 +130,20 @@ async def create_report(
                 "Invalid content_type",
                 details=[{
                     "field": "content_type",
-                    "message": f"Must be one of: {', '.join(sorted(VALID_CONTENT_TYPES))}",
+                    "message": "Must be one of: sighting, feeding_spot, tnr_record",
+                }],
+            ),
+        )
+
+    if reason not in VALID_REASONS:
+        raise HTTPException(
+            status_code=422,
+            detail=error_response(
+                422,
+                "Invalid reason",
+                details=[{
+                    "field": "reason",
+                    "message": f"Must be one of: {', '.join(sorted(VALID_REASONS))}",
                 }],
             ),
         )
