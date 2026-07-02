@@ -137,59 +137,61 @@ async def confirm_sighting(
             detail=error_response(410, "Draft expired"),
         )
 
-    if cat_id is not None:
-        cat = await db.fetchrow(
-            "SELECT id FROM cat_profiles WHERE id = $1",
-            cat_id,
-        )
-        if cat is None:
-            raise HTTPException(
-                status_code=404,
-                detail=error_response(404, "Cat profile not found"),
+    async with db.acquire() as conn:
+        async with conn.transaction():
+            if cat_id is not None:
+                cat = await conn.fetchrow(
+                    "SELECT id FROM cat_profiles WHERE id = $1",
+                    cat_id,
+                )
+                if cat is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=error_response(404, "Cat profile not found"),
+                    )
+            else:
+                cat_id = await _create_cat_from_draft(conn, draft, user_id)
+
+            sighting_id = str(uuid4())
+            await conn.execute(
+                """
+                INSERT INTO sightings (
+                    id, cat_profile_id, user_id, photo_url,
+                    location, blurred_location,
+                    observed_at, condition_tags,
+                    coat_color, pattern_type, notable_markings,
+                    ear_tip_status, body_size, notes
+                ) VALUES (
+                    $1, $2, $3, $4,
+                    $5, $6,
+                    $7, $8::jsonb,
+                    $9, $10, $11,
+                    $12, $13, $14
+                )
+                """,
+                sighting_id,
+                cat_id,
+                user_id,
+                draft["photo_url"],
+                draft["location"],
+                draft["blurred_location"],
+                draft["observed_at"],
+                draft["condition_tags"],
+                draft["coat_color"],
+                draft["pattern_type"],
+                draft["notable_markings"],
+                draft["ear_tip_status"],
+                draft["body_size"],
+                draft["notes"],
             )
-    else:
-        cat_id = await _create_cat_from_draft(db, draft, user_id)
 
-    sighting_id = str(uuid4())
-    await db.execute(
-        """
-        INSERT INTO sightings (
-            id, cat_profile_id, user_id, photo_url,
-            location, blurred_location,
-            observed_at, condition_tags,
-            coat_color, pattern_type, notable_markings,
-            ear_tip_status, body_size, notes
-        ) VALUES (
-            $1, $2, $3, $4,
-            $5, $6,
-            $7, $8::jsonb,
-            $9, $10, $11,
-            $12, $13, $14
-        )
-        """,
-        sighting_id,
-        cat_id,
-        user_id,
-        draft["photo_url"],
-        draft["location"],
-        draft["blurred_location"],
-        draft["observed_at"],
-        draft["condition_tags"],
-        draft["coat_color"],
-        draft["pattern_type"],
-        draft["notable_markings"],
-        draft["ear_tip_status"],
-        draft["body_size"],
-        draft["notes"],
-    )
-
-    await db.execute("DELETE FROM sighting_drafts WHERE id = $1", draft_id)
+            await conn.execute("DELETE FROM sighting_drafts WHERE id = $1", draft_id)
 
     return {"sighting_id": sighting_id, "cat_profile_id": cat_id}
 
 
 async def _create_cat_from_draft(
-    db: asyncpg.Pool,
+    conn: asyncpg.Connection,
     draft: asyncpg.Record,
     user_id: str,
 ) -> str:
@@ -203,7 +205,7 @@ async def _create_cat_from_draft(
     embedding_str = f"[{','.join(str(x) for x in embedding)}]" if embedding else None
     ear_tip_status = draft["ear_tip_status"] if draft["ear_tip_status"] is not None else False
 
-    await db.execute(
+    await conn.execute(
         """
         INSERT INTO cat_profiles (
             id, name, coat_color, pattern_type, notable_markings,
