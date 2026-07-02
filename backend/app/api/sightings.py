@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 import asyncpg  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
@@ -59,6 +61,10 @@ async def initiate_endpoint(
         param_errors.append(
             {"field": "body_size", "message": f"Invalid value. Must be one of: {valid}"}
         )
+    try:
+        datetime.fromisoformat(observed_at)
+    except ValueError:
+        param_errors.append({"field": "observed_at", "message": "Must be ISO 8601 datetime"})
     if param_errors:
         raise HTTPException(
             status_code=422,
@@ -107,8 +113,8 @@ async def initiate_endpoint(
 
 
 class ConfirmRequest(BaseModel):
-    draft_id: str
-    cat_id: str | None = None
+    draft_id: UUID
+    cat_id: UUID | None = None
 
 
 @router.post("/confirm", status_code=201)
@@ -121,6 +127,6 @@ async def confirm_endpoint(
     return await confirm_sighting(
         db=db,
         user_id=user.id,
-        draft_id=body.draft_id,
-        cat_id=body.cat_id,
+        draft_id=str(body.draft_id),
+        cat_id=str(body.cat_id) if body.cat_id else None,
     )
