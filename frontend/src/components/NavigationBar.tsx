@@ -61,6 +61,17 @@ export function NavigationBar() {
                 >
                   DASHBOARD
                 </Link>
+                <Link
+                  href="/sightings/new"
+                  className={`text-sm font-bold px-3 py-1
+                    focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
+                    ${isActive("/sightings/new")
+                      ? "bg-primary-500 text-white border-2 border-neutral-900"
+                      : "text-neutral-700 hover:text-primary-500"
+                    }`}
+                >
+                  REPORT SIGHTING
+                </Link>
                 <span className="text-sm text-neutral-500 font-bold">{user.email}</span>
                 <button
                   onClick={handleLogout}
