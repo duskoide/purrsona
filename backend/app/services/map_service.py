@@ -202,10 +202,10 @@ async def get_cat_profile(
         ),
         db.fetch(
             """
-            SELECT id, status_change, notes, created_at
-            FROM tnr_records
-            WHERE cat_profile_id = $1
-            ORDER BY created_at DESC
+        SELECT id, status_change, content, created_at
+        FROM tnr_records
+        WHERE cat_profile_id = $1
+        ORDER BY created_at DESC
             """,
             cat_id,
         ),
@@ -238,7 +238,7 @@ async def get_cat_profile(
             {
                 "id": str(row["id"]),
                 "status_change": row["status_change"],
-                "notes": row["notes"],
+                "notes": row["content"],
                 "created_at": row["created_at"].isoformat(),
             }
         )
