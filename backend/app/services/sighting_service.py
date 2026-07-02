@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
 import asyncpg
+from fastapi import HTTPException, UploadFile
 
 from app.core.error_handlers import error_response
 from app.services.coordinate_service import blur_coordinate
 from app.services.embedding_service import embedding_service
 from app.services.image_service import upload_image
-from fastapi import HTTPException, UploadFile
 
 
 async def initiate_sighting(
@@ -131,61 +131,60 @@ async def confirm_sighting(
             detail=error_response(403, "Not your draft"),
         )
 
-    if draft["draft_expires_at"] < datetime.now(timezone.utc):
+    if draft["draft_expires_at"] < datetime.now(UTC):
         raise HTTPException(
             status_code=410,
             detail=error_response(410, "Draft expired"),
         )
 
-    async with db.acquire() as conn:
-        async with conn.transaction():
-            if cat_id is not None:
-                cat = await conn.fetchrow(
-                    "SELECT id FROM cat_profiles WHERE id = $1",
-                    cat_id,
-                )
-                if cat is None:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=error_response(404, "Cat profile not found"),
-                    )
-            else:
-                cat_id = await _create_cat_from_draft(conn, draft, user_id)
-
-            sighting_id = str(uuid4())
-            await conn.execute(
-                """
-                INSERT INTO sightings (
-                    id, cat_profile_id, user_id, photo_url,
-                    location, blurred_location,
-                    observed_at, condition_tags,
-                    coat_color, pattern_type, notable_markings,
-                    ear_tip_status, body_size, notes
-                ) VALUES (
-                    $1, $2, $3, $4,
-                    $5, $6,
-                    $7, $8::jsonb,
-                    $9, $10, $11,
-                    $12, $13, $14
-                )
-                """,
-                sighting_id,
+    async with db.acquire() as conn, conn.transaction():
+        if cat_id is not None:
+            cat = await conn.fetchrow(
+                "SELECT id FROM cat_profiles WHERE id = $1",
                 cat_id,
-                user_id,
-                draft["photo_url"],
-                draft["location"],
-                draft["blurred_location"],
-                draft["observed_at"],
-                draft["condition_tags"],
-                draft["coat_color"],
-                draft["pattern_type"],
-                draft["notable_markings"],
-                draft["ear_tip_status"],
-                draft["body_size"],
-                draft["notes"],
             )
+            if cat is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=error_response(404, "Cat profile not found"),
+                )
+        else:
+            cat_id = await _create_cat_from_draft(conn, draft, user_id)
 
-            await conn.execute("DELETE FROM sighting_drafts WHERE id = $1", draft_id)
+        sighting_id = str(uuid4())
+        await conn.execute(
+            """
+            INSERT INTO sightings (
+                id, cat_profile_id, user_id, photo_url,
+                location, blurred_location,
+                observed_at, condition_tags,
+                coat_color, pattern_type, notable_markings,
+                ear_tip_status, body_size, notes
+            ) VALUES (
+                $1, $2, $3, $4,
+                $5, $6,
+                $7, $8::jsonb,
+                $9, $10, $11,
+                $12, $13, $14
+            )
+            """,
+            sighting_id,
+            cat_id,
+            user_id,
+            draft["photo_url"],
+            draft["location"],
+            draft["blurred_location"],
+            draft["observed_at"],
+            draft["condition_tags"],
+            draft["coat_color"],
+            draft["pattern_type"],
+            draft["notable_markings"],
+            draft["ear_tip_status"],
+            draft["body_size"],
+            draft["notes"],
+        )
+
+        await conn.execute("DELETE FROM sighting_drafts WHERE id = $1", draft_id)
 
     return {"sighting_id": sighting_id, "cat_profile_id": cat_id}
 

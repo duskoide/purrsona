@@ -75,15 +75,17 @@ async def initiate_endpoint(
         tags = json.loads(condition_tags)
         if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
             raise ValueError
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError) as err:
         raise HTTPException(
             status_code=422,
             detail=error_response(
                 422,
                 "Invalid parameters",
-                details=[{"field": "condition_tags", "message": "Must be a JSON array of strings"}],
+                details=[
+                    {"field": "condition_tags", "message": "Must be a JSON array of strings"}
+                ],
             ),
-        )
+        ) from err
 
     if not tags:
         raise HTTPException(
@@ -91,7 +93,9 @@ async def initiate_endpoint(
             detail=error_response(
                 422,
                 "Invalid parameters",
-                details=[{"field": "condition_tags", "message": "At least one condition tag is required"}],
+                details=[
+                    {"field": "condition_tags", "message": "At least one condition tag is required"}
+                ],
             ),
         )
 
