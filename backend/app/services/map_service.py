@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import asyncpg
@@ -32,6 +33,7 @@ async def get_map_markers(
         JOIN cat_profiles c ON s.cat_profile_id = c.id
         WHERE s.blurred_location && ST_MakeEnvelope($1, $2, $3, $4, 4326)
         ORDER BY s.observed_at DESC
+        LIMIT 500
         """,
         min_lng, min_lat, max_lng, max_lat,
     )
@@ -66,6 +68,7 @@ async def get_map_markers(
             details
         FROM feeding_spots
         WHERE blurred_location && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+        LIMIT 500
         """,
         min_lng, min_lat, max_lng, max_lat,
     )
@@ -171,36 +174,47 @@ async def get_cat_profile(
     cat_id: str,
 ) -> dict[str, Any] | None:
     """Full cat profile with computed status_tags, sighting history, and TNR records."""
-    cat = await db.fetchrow(
-        "SELECT * FROM cat_profiles WHERE id = $1",
-        cat_id,
+    cat, tag_rows, sighting_rows, tnr_rows = await asyncio.gather(
+        db.fetchrow(
+            "SELECT * FROM cat_profiles WHERE id = $1",
+            cat_id,
+        ),
+        db.fetch(
+            "SELECT DISTINCT jsonb_array_elements_text(condition_tags) AS tag "
+            "FROM sightings WHERE cat_profile_id = $1",
+            cat_id,
+        ),
+        db.fetch(
+            """
+            SELECT
+                id,
+                ST_Y(blurred_location::geometry) AS lat,
+                ST_X(blurred_location::geometry) AS lng,
+                observed_at,
+                condition_tags,
+                photo_url,
+                notes
+            FROM sightings
+            WHERE cat_profile_id = $1
+            ORDER BY observed_at DESC
+            """,
+            cat_id,
+        ),
+        db.fetch(
+            """
+            SELECT id, status_change, notes, created_at
+            FROM tnr_records
+            WHERE cat_profile_id = $1
+            ORDER BY created_at DESC
+            """,
+            cat_id,
+        ),
     )
+
     if cat is None:
         return None
 
-    tag_rows = await db.fetch(
-        "SELECT DISTINCT jsonb_array_elements_text(condition_tags) AS tag "
-        "FROM sightings WHERE cat_profile_id = $1",
-        cat_id,
-    )
     status_tags = sorted(row["tag"] for row in tag_rows)
-
-    sighting_rows = await db.fetch(
-        """
-        SELECT
-            id,
-            ST_Y(blurred_location::geometry) AS lat,
-            ST_X(blurred_location::geometry) AS lng,
-            observed_at,
-            condition_tags,
-            photo_url,
-            notes
-        FROM sightings
-        WHERE cat_profile_id = $1
-        ORDER BY observed_at DESC
-        """,
-        cat_id,
-    )
 
     sighting_history = []
     for row in sighting_rows:
@@ -217,16 +231,6 @@ async def get_cat_profile(
                 "notes": row["notes"],
             }
         )
-
-    tnr_rows = await db.fetch(
-        """
-        SELECT id, status_change, notes, created_at
-        FROM tnr_records
-        WHERE cat_profile_id = $1
-        ORDER BY created_at DESC
-        """,
-        cat_id,
-    )
 
     tnr_records = []
     for row in tnr_rows:
