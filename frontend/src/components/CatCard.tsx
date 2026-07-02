@@ -25,7 +25,7 @@ const TNR_STATUS_MAP: Record<string, "verified" | "signed_in" | "pending"> = {
 export function CatCard({ id, name, tnrStatus, coatColor, patternType, latestPhoto }: CatCardProps) {
   return (
     <Link href={`/cats/${id}`}>
-      <Card variant="standard" className="hover:shadow-lg transition-shadow cursor-pointer">
+      <Card variant="standard" className="hover:shadow-lg motion-safe:transition-shadow cursor-pointer">
         <div className="flex flex-col gap-3">
           {latestPhoto ? (
             <img
