@@ -26,6 +26,28 @@ export function NavigationBar() {
           </Link>
 
           <div className="flex items-center gap-4">
+            <Link
+              href="/map"
+              className={`text-sm font-bold px-3 py-1
+                focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
+                ${isActive("/map")
+                  ? "bg-primary-500 text-white border-2 border-neutral-900"
+                  : "text-neutral-700 hover:text-primary-500"
+                }`}
+            >
+              MAP
+            </Link>
+            <Link
+              href="/cats"
+              className={`text-sm font-bold px-3 py-1
+                focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
+                ${isActive("/cats")
+                  ? "bg-primary-500 text-white border-2 border-neutral-900"
+                  : "text-neutral-700 hover:text-primary-500"
+                }`}
+            >
+              CATS
+            </Link>
             {user ? (
               <>
                 <Link
