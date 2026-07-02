@@ -15,10 +15,8 @@ async def get_map_markers(
     max_lng: float,
 ) -> dict[str, list]:
     """Get sightings and feeding spots within a bounding box."""
-    bbox = f"ST_MakeEnvelope({min_lng}, {min_lat}, {max_lng}, {max_lat}, 4326)"
-
     sighting_rows = await db.fetch(
-        f"""
+        """
         SELECT
             s.id,
             ST_Y(s.blurred_location::geometry) AS lat,
@@ -32,9 +30,10 @@ async def get_map_markers(
             c.pattern_type
         FROM sightings s
         JOIN cat_profiles c ON s.cat_profile_id = c.id
-        WHERE s.blurred_location && {bbox}
+        WHERE s.blurred_location && ST_MakeEnvelope($1, $2, $3, $4, 4326)
         ORDER BY s.observed_at DESC
-        """
+        """,
+        min_lng, min_lat, max_lng, max_lat,
     )
 
     sightings = []
@@ -59,15 +58,16 @@ async def get_map_markers(
         )
 
     spot_rows = await db.fetch(
-        f"""
+        """
         SELECT
             id,
             ST_Y(blurred_location::geometry) AS lat,
             ST_X(blurred_location::geometry) AS lng,
             details
         FROM feeding_spots
-        WHERE blurred_location && {bbox}
-        """
+        WHERE blurred_location && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+        """,
+        min_lng, min_lat, max_lng, max_lat,
     )
 
     feeding_spots = []
