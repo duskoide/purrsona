@@ -115,29 +115,29 @@ async def confirm_sighting(
     If cat_id is None, creates a new cat profile ("none of these").
     Returns dict with sighting_id and cat_profile_id.
     """
-    draft = await db.fetchrow(
-        "SELECT * FROM sighting_drafts WHERE id = $1",
-        draft_id,
-    )
-    if draft is None:
-        raise HTTPException(
-            status_code=404,
-            detail=error_response(404, "Draft not found"),
-        )
-
-    if draft["user_id"] != user_id:
-        raise HTTPException(
-            status_code=403,
-            detail=error_response(403, "Not your draft"),
-        )
-
-    if draft["draft_expires_at"] < datetime.now(UTC):
-        raise HTTPException(
-            status_code=410,
-            detail=error_response(410, "Draft expired"),
-        )
-
     async with db.acquire() as conn, conn.transaction():
+        draft = await conn.fetchrow(
+            "SELECT * FROM sighting_drafts WHERE id = $1 FOR UPDATE",
+            draft_id,
+        )
+        if draft is None:
+            raise HTTPException(
+                status_code=404,
+                detail=error_response(404, "Draft not found"),
+            )
+
+        if draft["user_id"] != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail=error_response(403, "Not your draft"),
+            )
+
+        if draft["draft_expires_at"] < datetime.now(UTC):
+            raise HTTPException(
+                status_code=410,
+                detail=error_response(410, "Draft expired"),
+            )
+
         if cat_id is not None:
             cat = await conn.fetchrow(
                 "SELECT id FROM cat_profiles WHERE id = $1",
