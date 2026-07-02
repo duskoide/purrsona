@@ -158,7 +158,7 @@ export function SightingWizard() {
         {step === 2 && (
           <div>
             <h2 className="text-2xl font-bold mb-4">Pick Location</h2>
-            <LocationPicker onLocationSelect={setLocation} selectedLocation={location} />
+            <LocationPicker onLocationSelect={(lat, lng) => setLocation([lat, lng])} selectedLocation={location} />
           </div>
         )}
 
