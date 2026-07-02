@@ -25,5 +25,10 @@ class Settings(BaseSettings):
     # Coordinate blurring
     BLUR_RADIUS_METERS: int = 200
 
+    # Cat matching
+    SIMILARITY_THRESHOLD: float = 0.65
+    EMBEDDING_DEVICE: str = "cpu"
+    MAX_MATCH_CANDIDATES: int = 3
+
 
 settings = Settings()
