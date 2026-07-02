@@ -10,6 +10,7 @@ from starlette.middleware.cors import CORSMiddleware
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.cats import router as cats_router
+from app.api.feeding import router as feeding_router
 from app.api.map import router as map_router
 from app.api.matching import router as matching_router
 from app.api.sightings import router as sightings_router
@@ -61,6 +62,7 @@ app.include_router(matching_router)
 app.include_router(sightings_router)
 app.include_router(map_router)
 app.include_router(cats_router)
+app.include_router(feeding_router)
 
 
 @app.get("/health")
