@@ -20,6 +20,11 @@ interface MapContainerProps {
 export function MapContainer({ center, zoom, onClick, onBoundsChange }: MapContainerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
+  const onClickRef = useRef(onClick);
+  const onBoundsChangeRef = useRef(onBoundsChange);
+
+  useEffect(() => { onClickRef.current = onClick; }, [onClick]);
+  useEffect(() => { onBoundsChangeRef.current = onBoundsChange; }, [onBoundsChange]);
 
   useEffect(() => {
     if (!mapRef.current || leafletMapRef.current) return;
@@ -31,26 +36,21 @@ export function MapContainer({ center, zoom, onClick, onBoundsChange }: MapConta
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    if (onClick) {
-      map.on("click", (e: L.LeafletMouseEvent) => {
-        onClick(e.latlng.lat, e.latlng.lng);
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      onClickRef.current?.(e.latlng.lat, e.latlng.lng);
+    });
+
+    const updateBounds = () => {
+      onBoundsChangeRef.current?.({
+        min_lat: map.getBounds().getSouth(),
+        min_lng: map.getBounds().getWest(),
+        max_lat: map.getBounds().getNorth(),
+        max_lng: map.getBounds().getEast(),
       });
-    }
+    };
 
-    if (onBoundsChange) {
-      const updateBounds = () => {
-        const bounds = map.getBounds();
-        onBoundsChange({
-          min_lat: bounds.getSouth(),
-          min_lng: bounds.getWest(),
-          max_lat: bounds.getNorth(),
-          max_lng: bounds.getEast(),
-        });
-      };
-
-      map.on("moveend", updateBounds);
-      updateBounds();
-    }
+    map.on("moveend", updateBounds);
+    updateBounds();
 
     return () => {
       map.remove();
