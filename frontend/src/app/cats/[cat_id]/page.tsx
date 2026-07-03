@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/EmptyState";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { TnrRecordModal } from "@/components/TnrRecordModal";
+import { ReportModal } from "@/components/ReportModal";
 
 interface CatProfile {
   id: string;
@@ -53,6 +55,8 @@ export default function CatProfilePage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const { user } = useAuthContext();
+  const [tnrModalOpen, setTnrModalOpen] = useState(false);
+  const [reportModal, setReportModal] = useState<{ type: string; id: string } | null>(null);
 
   useEffect(() => {
     const fetchCat = async () => {
@@ -195,6 +199,11 @@ export default function CatProfilePage() {
                         </span>
                       ))}
                     </div>
+                    {user && (
+                      <Button variant="ghost" size="sm" className="mt-2" onClick={() => setReportModal({ type: "sighting", id: sighting.id })}>
+                        Report
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -205,7 +214,14 @@ export default function CatProfilePage() {
 
       {cat.tnr_records.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">TNR Records</h2>
+          <div className="flex items-center gap-4 mb-4">
+            <h2 className="text-2xl font-bold">TNR Records</h2>
+            {user && (
+              <Button variant="secondary" size="sm" onClick={() => setTnrModalOpen(true)}>
+                Add TNR Record
+              </Button>
+            )}
+          </div>
           <div className="space-y-4">
             {cat.tnr_records.map((record) => (
               <Card key={record.id} variant="standard">
@@ -215,11 +231,31 @@ export default function CatProfilePage() {
                     {new Date(record.created_at).toLocaleDateString()}
                   </p>
                   {record.notes && <p className="mt-2">{record.notes}</p>}
+                  {user && (
+                    <Button variant="ghost" size="sm" className="mt-2" onClick={() => setReportModal({ type: "tnr_record", id: record.id })}>
+                      Report
+                    </Button>
+                  )}
                 </div>
               </Card>
             ))}
           </div>
         </div>
+      )}
+      <TnrRecordModal
+        catId={catId}
+        open={tnrModalOpen}
+        onClose={() => setTnrModalOpen(false)}
+        onSuccess={() => window.location.reload()}
+        isVerified={user?.role === "verified"}
+      />
+      {reportModal && (
+        <ReportModal
+          contentType={reportModal.type}
+          contentId={reportModal.id}
+          open={!!reportModal}
+          onClose={() => setReportModal(null)}
+        />
       )}
     </div>
   );
