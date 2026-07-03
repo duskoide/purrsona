@@ -14,6 +14,8 @@ interface ReportModalProps {
 }
 
 export function ReportModal({ contentType, contentId, open, onClose }: ReportModalProps) {
+  const reasonId = "report-reason";
+  const detailsId = "report-details";
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
   const [loading, setLoading] = useState(false);
@@ -79,11 +81,12 @@ export function ReportModal({ contentType, contentId, open, onClose }: ReportMod
             )}
 
             <div>
-              <label className="block text-sm mb-1">Reason *</label>
+              <label htmlFor={reasonId} className="block text-sm mb-1">Reason *</label>
               <select
+                id={reasonId}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="w-full border-2 border-neutral-900 px-3 py-2 text-base"
+                className="w-full border-2 border-neutral-900 px-3 py-2 text-base focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-3"
               >
                 <option value="">Select a reason...</option>
                 {REASONS.map((r) => (
@@ -93,11 +96,12 @@ export function ReportModal({ contentType, contentId, open, onClose }: ReportMod
             </div>
 
             <div>
-              <label className="block text-sm mb-1">Details (optional)</label>
+              <label htmlFor={detailsId} className="block text-sm mb-1">Details (optional)</label>
               <textarea
+                id={detailsId}
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
-                className="w-full border-2 border-neutral-900 px-3 py-2 text-base h-24"
+                className="w-full border-2 border-neutral-900 px-3 py-2 text-base h-24 font-sans focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-3"
                 placeholder="Provide additional context..."
               />
             </div>
