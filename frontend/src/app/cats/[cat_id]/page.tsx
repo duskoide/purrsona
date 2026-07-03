@@ -212,16 +212,16 @@ export default function CatProfilePage() {
         </div>
       )}
 
-      {cat.tnr_records.length > 0 && (
-        <div className="mt-8">
-          <div className="flex items-center gap-4 mb-4">
-            <h2 className="text-2xl font-bold">TNR Records</h2>
-            {user && (
-              <Button variant="secondary" size="sm" onClick={() => setTnrModalOpen(true)}>
-                Add TNR Record
-              </Button>
-            )}
-          </div>
+      <div className="mt-8">
+        <div className="flex items-center gap-4 mb-4">
+          <h2 className="text-2xl font-bold">TNR Records</h2>
+          {user && (
+            <Button variant="secondary" size="sm" onClick={() => setTnrModalOpen(true)}>
+              Add TNR Record
+            </Button>
+          )}
+        </div>
+        {cat.tnr_records.length > 0 ? (
           <div className="space-y-4">
             {cat.tnr_records.map((record) => (
               <Card key={record.id} variant="standard">
@@ -240,8 +240,10 @@ export default function CatProfilePage() {
               </Card>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-neutral-600">No TNR records yet.</p>
+        )}
+      </div>
       <TnrRecordModal
         catId={catId}
         open={tnrModalOpen}
