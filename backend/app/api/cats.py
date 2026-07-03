@@ -4,9 +4,13 @@ from typing import Any
 
 import asyncpg  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.core.error_handlers import error_response
+from app.core.rbac import require_role
 from app.db.pool import get_db
+from app.models.user import User, UserRole
+from app.services.cat_service import update_cat_profile
 from app.services.map_service import get_cat_profile, list_cats
 
 VALID_COAT_COLORS = {
@@ -71,3 +75,30 @@ async def cat_detail_endpoint(
             detail=error_response(404, "Cat not found"),
         )
     return profile
+
+
+class CatUpdateRequest(BaseModel):
+    name: str | None = None
+    coat_color: str | None = None
+    pattern_type: str | None = None
+    body_size: str | None = None
+    ear_tip_status: bool | None = None
+    notable_markings: str | None = None
+
+
+@router.patch("/{cat_id}")
+async def cat_update_endpoint(
+    cat_id: str,
+    body: CatUpdateRequest,
+    user: User = Depends(require_role(UserRole.SIGNED_IN)),
+    db: asyncpg.Pool = Depends(get_db),
+) -> dict[str, Any]:
+    """Update cat profile metadata."""
+    updates = body.model_dump(exclude_none=True)
+    result = await update_cat_profile(db, cat_id, updates)
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=error_response(404, "Cat not found"),
+        )
+    return result

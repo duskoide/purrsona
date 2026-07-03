@@ -6,6 +6,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Card } from "@/components/Card";
 import { PixelSpinner } from "@/components/PixelSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import Link from "next/link";
+import { Button } from "@/components/Button";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 interface CatProfile {
   id: string;
@@ -49,6 +52,7 @@ export default function CatProfilePage() {
   const [cat, setCat] = useState<CatProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const { user } = useAuthContext();
 
   useEffect(() => {
     const fetchCat = async () => {
@@ -111,6 +115,11 @@ export default function CatProfilePage() {
           <div className="flex items-center gap-4 mb-4">
             <h1 className="text-3xl font-bold">{cat.name || "Unknown"}</h1>
             <StatusBadge status={TNR_STATUS_MAP[cat.tnr_status] || "signed_in"} />
+            {user && (
+              <Link href={`/cats/${catId}/edit`}>
+                <Button variant="secondary" size="sm">Edit</Button>
+              </Link>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
