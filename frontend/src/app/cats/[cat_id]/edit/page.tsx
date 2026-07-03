@@ -37,7 +37,7 @@ export default function EditCatPage() {
   useEffect(() => {
     const fetchCat = async () => {
       try {
-        const res = await fetch(`/api/v1/cats/${catId}`);
+        const res = await fetch(`/api/v1/cats/${catId}`, { credentials: "include" });
         if (!res.ok) throw new Error("Failed to fetch cat");
         const data = await res.json();
         setName(data.name || "");
