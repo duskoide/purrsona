@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import AsyncGenerator
 
 import asyncpg
@@ -30,10 +31,10 @@ async def db_pool() -> AsyncGenerator[asyncpg.Pool, None]:
 
 @pytest_asyncio.fixture
 async def clean_db(db_pool: asyncpg.Pool) -> AsyncGenerator[None, None]:
-    yield
     async with db_pool.acquire() as conn:
         for table in TABLES_TO_TRUNCATE:
             await conn.execute(f"TRUNCATE {table} CASCADE")
+    yield
 
 
 @pytest_asyncio.fixture
@@ -66,29 +67,38 @@ async def _login_user(client: AsyncClient, email: str, password: str = "testpass
 
 
 @pytest_asyncio.fixture
-async def auth_client(client: AsyncClient) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
-    email = "testuser@purrsona.local"
-    user_data = await _register_user(client, email)
-    client = await _login_user(client, email)
-    yield client, user_data
+async def auth_client(app) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
+    email = f"testuser-{uuid.uuid4().hex[:8]}@purrsona.local"
+    transport = ASGITransport(app=app)
+    ac = AsyncClient(transport=transport, base_url="http://test")
+    user_data = await _register_user(ac, email)
+    await _login_user(ac, email)
+    yield ac, user_data
+    await ac.aclose()
 
 
 @pytest_asyncio.fixture
-async def verified_client(client: AsyncClient, db_pool: asyncpg.Pool) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
-    email = "verified@purrsona.local"
-    user_data = await _register_user(client, email)
+async def verified_client(app, db_pool: asyncpg.Pool) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
+    email = f"verified-{uuid.uuid4().hex[:8]}@purrsona.local"
+    transport = ASGITransport(app=app)
+    ac = AsyncClient(transport=transport, base_url="http://test")
+    user_data = await _register_user(ac, email)
     async with db_pool.acquire() as conn:
         await conn.execute(
             "UPDATE users SET role = 'verified', verified_at = NOW() WHERE id = $1",
             user_data["user_id"],
         )
-    client = await _login_user(client, email)
-    yield client, user_data
+    await _login_user(ac, email)
+    yield ac, user_data
+    await ac.aclose()
 
 
 @pytest_asyncio.fixture
-async def second_auth_client(client: AsyncClient) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
-    email = "other@purrsona.local"
-    user_data = await _register_user(client, email)
-    client = await _login_user(client, email)
-    yield client, user_data
+async def second_auth_client(app) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
+    email = f"other-{uuid.uuid4().hex[:8]}@purrsona.local"
+    transport = ASGITransport(app=app)
+    ac = AsyncClient(transport=transport, base_url="http://test")
+    user_data = await _register_user(ac, email)
+    await _login_user(ac, email)
+    yield ac, user_data
+    await ac.aclose()
