@@ -40,9 +40,17 @@ async def clean_db(db_pool: asyncpg.Pool) -> AsyncGenerator[None, None]:
 @pytest_asyncio.fixture
 async def app(db_pool: asyncpg.Pool, clean_db: None):
     from app.main import app as fastapi_app
+    from app.core.rate_limit import RateLimitMiddleware
 
     pool_module._pool = db_pool
     fastapi_app.router.lifespan_context = None
+
+    # Remove rate limiter for tests
+    fastapi_app.user_middleware = [
+        m for m in fastapi_app.user_middleware
+        if m.cls != RateLimitMiddleware
+    ]
+
     yield fastapi_app
     pool_module._pool = None
 
