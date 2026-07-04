@@ -72,6 +72,17 @@ export function NavigationBar() {
                 >
                   REPORT SIGHTING
                 </Link>
+                <Link
+                  href="/feeding-spots/new"
+                  className={`text-sm font-bold px-3 py-1
+                    focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
+                    ${isActive("/feeding-spots/new")
+                      ? "bg-primary-500 text-white border-2 border-neutral-900"
+                      : "text-neutral-700 hover:text-primary-500"
+                    }`}
+                >
+                  FEEDING SPOTS
+                </Link>
                 <span className="text-sm text-neutral-500 font-bold">{user.email}</span>
                 <button
                   onClick={handleLogout}
