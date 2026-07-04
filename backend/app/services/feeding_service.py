@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from uuid import uuid4
 
@@ -37,7 +38,7 @@ async def create_feeding_spot(
         latitude,
         blurred_lng,
         blurred_lat,
-        details,
+        json.dumps(details),
     )
 
     return {

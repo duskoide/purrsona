@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 import asyncpg  # type: ignore[import-untyped]
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.core.error_handlers import error_response
@@ -31,16 +31,16 @@ router = APIRouter(prefix="/api/v1/sightings", tags=["sightings"])
 @router.post("/initiate", status_code=201)
 async def initiate_endpoint(
     image: UploadFile,
-    latitude: float,
-    longitude: float,
-    observed_at: str,
-    condition_tags: str,
-    coat_color: str,
-    pattern_type: str,
-    notable_markings: str | None = None,
-    ear_tip_status: bool | None = None,
-    body_size: str | None = None,
-    notes: str | None = None,
+    latitude: float = Form(),
+    longitude: float = Form(),
+    observed_at: str = Form(),
+    condition_tags: str = Form(),
+    coat_color: str = Form(),
+    pattern_type: str = Form(),
+    notable_markings: str | None = Form(default=None),
+    ear_tip_status: bool | None = Form(default=None),
+    body_size: str | None = Form(default=None),
+    notes: str | None = Form(default=None),
     user: User = Depends(require_role(UserRole.SIGNED_IN)),
     db: asyncpg.Pool = Depends(get_db),
 ) -> dict[str, Any]:
