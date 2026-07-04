@@ -68,7 +68,7 @@ async def _login_user(client: AsyncClient, email: str, password: str = "testpass
 
 @pytest_asyncio.fixture
 async def auth_client(app) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
-    email = f"testuser-{uuid.uuid4().hex[:8]}@purrsona.local"
+    email = "testuser@purrsona.local"
     transport = ASGITransport(app=app)
     ac = AsyncClient(transport=transport, base_url="http://test")
     user_data = await _register_user(ac, email)
@@ -79,7 +79,7 @@ async def auth_client(app) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
 
 @pytest_asyncio.fixture
 async def verified_client(app, db_pool: asyncpg.Pool) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
-    email = f"verified-{uuid.uuid4().hex[:8]}@purrsona.local"
+    email = "verified@purrsona.local"
     transport = ASGITransport(app=app)
     ac = AsyncClient(transport=transport, base_url="http://test")
     user_data = await _register_user(ac, email)
@@ -95,7 +95,7 @@ async def verified_client(app, db_pool: asyncpg.Pool) -> AsyncGenerator[tuple[As
 
 @pytest_asyncio.fixture
 async def second_auth_client(app) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
-    email = f"other-{uuid.uuid4().hex[:8]}@purrsona.local"
+    email = "other@purrsona.local"
     transport = ASGITransport(app=app)
     ac = AsyncClient(transport=transport, base_url="http://test")
     user_data = await _register_user(ac, email)
