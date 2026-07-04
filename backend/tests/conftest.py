@@ -1,15 +1,13 @@
-import asyncio
 from collections.abc import AsyncGenerator
 
 import asyncpg
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import settings
 from app.db import pool as pool_module
 
-TEST_DATABASE_URL = settings.DATABASE_URL.replace("/purrsona", "/purrsona_test")
+TEST_DATABASE_URL = settings.DATABASE_URL.rsplit("/", 1)[0] + "/purrsona_test"
 
 TABLES_TO_TRUNCATE = [
     "content_reports",
@@ -23,14 +21,7 @@ TABLES_TO_TRUNCATE = [
 ]
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def db_pool() -> AsyncGenerator[asyncpg.Pool, None]:
     pool = await asyncpg.create_pool(TEST_DATABASE_URL, min_size=2, max_size=10)
     yield pool
@@ -50,6 +41,7 @@ async def app(db_pool: asyncpg.Pool, clean_db: None):
     from app.main import app as fastapi_app
 
     pool_module._pool = db_pool
+    fastapi_app.router.lifespan_context = None
     yield fastapi_app
     pool_module._pool = None
 
