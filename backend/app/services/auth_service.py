@@ -1,11 +1,13 @@
 import re
+import uuid
 
 import asyncpg
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 
 from app.core.error_handlers import error_response
 from app.core.security import create_token, hash_password, verify_password
 from app.models.user import User
+from app.services.image_service import upload_image
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
@@ -33,7 +35,9 @@ async def register(db: asyncpg.Pool, email: str, password: str) -> tuple[User, s
             ),
         )
 
-    existing = await db.fetchrow("SELECT id FROM users WHERE email = $1", email)
+    existing = await db.fetchrow(
+        "SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL", email
+    )
     if existing:
         raise HTTPException(
             status_code=422,
@@ -47,7 +51,7 @@ async def register(db: asyncpg.Pool, email: str, password: str) -> tuple[User, s
     row = await db.fetchrow(
         """INSERT INTO users (email, password_hash, role)
            VALUES ($1, $2, 'signed_in')
-           RETURNING id, email, role, created_at, verified_at""",
+           RETURNING id, email, role, created_at, verified_at, avatar_url""",
         email,
         password_hash,
     )
@@ -61,8 +65,8 @@ async def login(db: asyncpg.Pool, email: str, password: str) -> tuple[User, str]
     email = email.strip().lower()
 
     row = await db.fetchrow(
-        "SELECT id, email, password_hash, role, created_at, verified_at "
-        "FROM users WHERE email = $1",
+        "SELECT id, email, password_hash, role, created_at, verified_at, avatar_url "
+        "FROM users WHERE email = $1 AND deleted_at IS NULL",
         email,
     )
 
@@ -175,3 +179,101 @@ async def bootstrap_admin(db: asyncpg.Pool, email: str | None) -> None:
     )
     if result == "UPDATE 1":
         print(f"Bootstrap: promoted {email} to verified role")
+
+
+async def update_email(
+    db: asyncpg.Pool, user_id: str, new_email: str, current_password: str
+) -> User:
+    """Change a user's email address. Requires current password confirmation."""
+    new_email = new_email.strip().lower()
+
+    if not EMAIL_RE.match(new_email):
+        raise HTTPException(
+            status_code=422,
+            detail=error_response(
+                422, "Invalid email format",
+                details=[{"field": "email", "message": "Invalid email format"}],
+            ),
+        )
+
+    row = await db.fetchrow(
+        "SELECT id, password_hash FROM users WHERE id = $1 AND deleted_at IS NULL", user_id
+    )
+    if row is None or not verify_password(current_password, row["password_hash"]):
+        raise HTTPException(
+            status_code=401,
+            detail=error_response(401, "Current password is incorrect"),
+        )
+
+    existing = await db.fetchrow(
+        "SELECT id FROM users WHERE email = $1 AND id != $2 AND deleted_at IS NULL",
+        new_email,
+        user_id,
+    )
+    if existing:
+        raise HTTPException(
+            status_code=422,
+            detail=error_response(
+                422, "Email already registered",
+                details=[{"field": "email", "message": "Email already registered"}],
+            ),
+        )
+
+    updated = await db.fetchrow(
+        """UPDATE users SET email = $1 WHERE id = $2
+           RETURNING id, email, role, created_at, verified_at, avatar_url""",
+        new_email,
+        user_id,
+    )
+    return User.from_row(updated)
+
+
+async def update_avatar(db: asyncpg.Pool, user_id: str, image: UploadFile) -> User:
+    """Upload and set a user's profile picture."""
+    avatar_url = await upload_image(image)
+
+    updated = await db.fetchrow(
+        """UPDATE users SET avatar_url = $1 WHERE id = $2
+           RETURNING id, email, role, created_at, verified_at, avatar_url""",
+        avatar_url,
+        user_id,
+    )
+    if updated is None:
+        raise HTTPException(
+            status_code=404,
+            detail=error_response(404, "User not found"),
+        )
+    return User.from_row(updated)
+
+
+async def delete_account(db: asyncpg.Pool, user_id: str, current_password: str) -> None:
+    """Delete a user's account.
+
+    This is a soft delete: PII (email, password hash, avatar) is scrubbed and
+    the account is flagged with deleted_at, but the row itself is kept. A
+    hard DELETE is not safe here — sightings, feeding_spots, tnr_records, and
+    content_reports all have NOT NULL, NO ACTION foreign keys to users(id),
+    so removing the row would either raise a foreign key violation or require
+    cascading away community-contributed data (sighting history, TNR
+    records) that has value independent of the deleting user's account.
+    """
+    row = await db.fetchrow(
+        "SELECT id, password_hash FROM users WHERE id = $1 AND deleted_at IS NULL",
+        user_id,
+    )
+    if row is None or not verify_password(current_password, row["password_hash"]):
+        raise HTTPException(
+            status_code=401,
+            detail=error_response(401, "Current password is incorrect"),
+        )
+
+    scrubbed_email = f"deleted-user-{user_id}@purrsona.invalid"
+    random_hash = hash_password(uuid.uuid4().hex)
+    await db.execute(
+        """UPDATE users
+           SET email = $1, password_hash = $2, avatar_url = NULL, deleted_at = NOW()
+           WHERE id = $3""",
+        scrubbed_email,
+        random_hash,
+        user_id,
+    )

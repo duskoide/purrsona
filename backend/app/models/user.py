@@ -16,6 +16,8 @@ class User:
     role: UserRole
     created_at: datetime
     verified_at: datetime | None = None
+    avatar_url: str | None = None
+    deleted_at: datetime | None = None
 
     @classmethod
     def from_row(cls, row) -> "User":
@@ -25,5 +27,7 @@ class User:
             role=UserRole(row["role"]),
             created_at=row["created_at"],
             verified_at=row.get("verified_at"),
+            avatar_url=row.get("avatar_url"),
+            deleted_at=row.get("deleted_at"),
         )
 

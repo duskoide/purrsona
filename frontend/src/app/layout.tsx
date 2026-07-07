@@ -18,14 +18,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ErrorBoundary>
-          <AuthProvider>
-            <ToastProvider>
-              <NavigationBar />
-              {children}
-            </ToastProvider>
-          </AuthProvider>
-        </ErrorBoundary>
+        <AuthProvider>
+          <ToastProvider>
+            <NavigationBar />
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

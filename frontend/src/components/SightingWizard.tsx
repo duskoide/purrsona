@@ -8,6 +8,7 @@ import { ImageUpload } from "./ImageUpload";
 import { LocationPicker } from "./LocationPicker";
 import { TagSelector } from "./TagSelector";
 import { PixelSpinner } from "./PixelSpinner";
+import { TextInput } from "./TextInput";
 
 const COAT_COLORS = [
   "black", "white", "orange", "gray", "brown",
@@ -44,6 +45,7 @@ export function SightingWizard() {
   const [observedAt, setObservedAt] = useState("");
   const [conditionTags, setConditionTags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [reporterContact, setReporterContact] = useState("");
 
   const [draftId, setDraftId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
@@ -71,6 +73,7 @@ export function SightingWizard() {
       if (earTip) formData.append("ear_tip_status", "true");
       if (markings) formData.append("notable_markings", markings);
       if (notes) formData.append("notes", notes);
+      if (reporterContact) formData.append("reporter_contact", reporterContact);
 
       const res = await fetch("/api/v1/sightings/initiate", {
         method: "POST",
@@ -219,10 +222,19 @@ export function SightingWizard() {
             </div>
 
             <div>
-              <label className="block text-sm mb-1">Notes</label>
+              <label className="block text-sm mb-1">Describe the sighting</label>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
-                className="w-full border-2 border-neutral-900 px-3 py-2 text-base h-24" placeholder="Optional notes..." />
+                className="w-full border-2 border-neutral-900 px-3 py-2 text-base h-24"
+                placeholder="Where exactly did you see the cat? What was it doing? Any other details about its condition or behavior..." />
             </div>
+
+            <TextInput
+              label="Your contact info (optional)"
+              helper="Phone or email so a caretaker or TNR volunteer can reach you about this cat."
+              value={reporterContact}
+              onChange={(e) => setReporterContact(e.target.value)}
+              placeholder="e.g., (555) 123-4567 or you@example.com"
+            />
           </div>
         )}
 
