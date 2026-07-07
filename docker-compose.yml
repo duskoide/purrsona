@@ -10,8 +10,8 @@ services:
     depends_on:
       - backend
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
+      - ./frontend/src:/app/src:Z
+      - ./frontend/public:/app/public:Z
 
   backend:
     build:
@@ -34,8 +34,8 @@ services:
       minio:
         condition: service_healthy
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/migrations:/app/migrations
+      - ./backend/app:/app/app:Z
+      - ./backend/migrations:/app/migrations:Z
 
   db:
     build:
@@ -49,8 +49,8 @@ services:
       - POSTGRES_DB=purrsona
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backend/migrations/001_initial.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./backend/migrations/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - ./backend/migrations/001_initial.sql:/docker-entrypoint-initdb.d/01-schema.sql:Z
+      - ./backend/migrations/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U purrsona"]
       interval: 5s
@@ -58,7 +58,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio
+    image: docker.io/minio/minio
     ports:
       - "9000:9000"
       - "9001:9001"
