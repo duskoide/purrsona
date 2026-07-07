@@ -42,8 +42,11 @@ class EmbeddingService:
 
     def _extract_sync(self, image_bytes: bytes) -> list[float]:
         """Synchronous embedding extraction. Runs in thread pool."""
-        assert self._model is not None, "Model not loaded — call load_model() first"
-        assert self._transform is not None, "Transform not loaded — call load_model() first"
+        # Not `assert` — assertions are stripped when Python runs in
+        # optimized mode (PYTHONOPTIMIZE=1 / `python -O`), which is common
+        # in production, and this check must always run.
+        if self._model is None or self._transform is None:
+            raise RuntimeError("Model not loaded — call load_model() first")
 
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         tensor = self._transform(image).unsqueeze(0).to(settings.EMBEDDING_DEVICE)
