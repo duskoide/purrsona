@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -86,7 +85,7 @@ async def initiate_sighting(
         blurred_lng,
         blurred_lat,
         datetime.fromisoformat(observed_at),
-        json.dumps(condition_tags),
+        condition_tags,
         coat_color,
         pattern_type,
         notable_markings,
@@ -94,7 +93,7 @@ async def initiate_sighting(
         body_size,
         notes,
         f"[{','.join(str(x) for x in embedding)}]",
-        json.dumps(candidates),
+        candidates,
     )
 
     return {
@@ -127,7 +126,7 @@ async def confirm_sighting(
                 detail=error_response(404, "Draft not found"),
             )
 
-        if str(draft["user_id"]) != user_id:
+        if draft["user_id"] != user_id:
             raise HTTPException(
                 status_code=403,
                 detail=error_response(403, "Not your draft"),
@@ -176,7 +175,7 @@ async def confirm_sighting(
             draft["location"],
             draft["blurred_location"],
             draft["observed_at"],
-            json.dumps(draft["condition_tags"]) if draft["condition_tags"] else "[]",
+            draft["condition_tags"],
             draft["coat_color"],
             draft["pattern_type"],
             draft["notable_markings"],
@@ -202,12 +201,7 @@ async def _create_cat_from_draft(
     """
     cat_id = str(uuid4())
     embedding = draft["embedding"]
-    if isinstance(embedding, str):
-        embedding_str = embedding
-    elif embedding is not None:
-        embedding_str = f"[{','.join(str(x) for x in embedding)}]"
-    else:
-        embedding_str = None
+    embedding_str = f"[{','.join(str(x) for x in embedding)}]" if embedding else None
     ear_tip_status = draft["ear_tip_status"] if draft["ear_tip_status"] is not None else False
 
     await conn.execute(
