@@ -22,7 +22,7 @@ test.describe("Auth: register/login flow", () => {
     await page.waitForURL("**/dashboard");
     await expect(page.getByRole("heading", { name: "PLAYER DASHBOARD" })).toBeVisible();
     await expect(
-      page.getByRole("navigation", { name: "Main navigation" }).getByText(email),
+      page.getByRole("navigation", { name: "Main navigation" }).getByText(email.split("@")[0], { exact: true }),
     ).toBeVisible();
   });
 
@@ -44,7 +44,7 @@ test.describe("Auth: register/login flow", () => {
     await expect(page.getByRole("heading", { name: "PLAYER DASHBOARD" })).toBeVisible();
 
     const nav = page.getByRole("navigation", { name: "Main navigation" });
-    await expect(nav.getByText(SEED_USERS.signedIn.email)).toBeVisible();
+    await expect(nav.getByText(SEED_USERS.signedIn.email.split("@")[0], { exact: true })).toBeVisible();
     await expect(nav.getByRole("link", { name: "MAP" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "CATS" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "DASHBOARD" })).toBeVisible();

@@ -25,10 +25,10 @@ export function NavigationBar() {
             PURRSONA
           </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 lg:gap-4">
             <Link
               href="/map"
-              className={`text-sm font-bold px-3 py-1
+              className={`text-sm font-bold px-2 lg:px-3 py-1
                 focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
                 ${isActive("/map")
                   ? "bg-primary-500 text-white border-2 border-neutral-900"
@@ -39,7 +39,7 @@ export function NavigationBar() {
             </Link>
             <Link
               href="/cats"
-              className={`text-sm font-bold px-3 py-1
+              className={`text-sm font-bold px-2 lg:px-3 py-1
                 focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
                 ${isActive("/cats")
                   ? "bg-primary-500 text-white border-2 border-neutral-900"
@@ -52,7 +52,7 @@ export function NavigationBar() {
               <>
                 <Link
                   href="/dashboard"
-                  className={`text-sm font-bold px-3 py-1
+                  className={`text-sm font-bold px-2 lg:px-3 py-1
                     focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
                     ${isActive("/dashboard")
                       ? "bg-primary-500 text-white border-2 border-neutral-900"
@@ -63,7 +63,7 @@ export function NavigationBar() {
                 </Link>
                 <Link
                   href="/sightings/new"
-                  className={`text-sm font-bold px-3 py-1
+                  className={`text-sm font-bold px-2 lg:px-3 py-1
                     focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
                     ${isActive("/sightings/new")
                       ? "bg-primary-500 text-white border-2 border-neutral-900"
@@ -74,7 +74,7 @@ export function NavigationBar() {
                 </Link>
                 <Link
                   href="/feeding-spots/new"
-                  className={`text-sm font-bold px-3 py-1
+                  className={`text-sm font-bold px-2 lg:px-3 py-1
                     focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
                     ${isActive("/feeding-spots/new")
                       ? "bg-primary-500 text-white border-2 border-neutral-900"
@@ -83,7 +83,9 @@ export function NavigationBar() {
                 >
                   FEEDING SPOTS
                 </Link>
-                <span className="text-sm text-neutral-500 font-bold">{user.email}</span>
+                <span className="text-sm text-neutral-500 font-bold">
+                  {user.email.split("@")[0]}
+                </span>
                 <button
                   onClick={handleLogout}
                   className="text-sm text-neutral-500 hover:text-error-main font-bold
@@ -96,7 +98,7 @@ export function NavigationBar() {
               <>
                 <Link
                   href="/auth/login"
-                  className={`text-sm font-bold px-3 py-1
+                  className={`text-sm font-bold px-2 lg:px-3 py-1
                     focus-visible:outline-3 focus-visible:outline-secondary-400 focus-visible:outline-offset-2
                     ${isActive("/auth/login")
                       ? "bg-primary-500 text-white border-2 border-neutral-900"
