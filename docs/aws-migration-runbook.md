@@ -4,7 +4,7 @@ Region: **ap-southeast-1** (Singapore)
 Compute: **ECS Fargate** (App Runner is unavailable — closed to new customers since April 30, 2026)
 Database: **RDS for PostgreSQL 16** with `pgvector` + `postgis`
 Storage: **S3**
-Scope: infrastructure only — provisioned by you via the AWS Console. No IaC, no CI/CD, no custom domain/TLS in this pass.
+Scope: infrastructure only — provisioned by you via the AWS Console. No IaC, no CI/CD. Custom domain (via existing Cloudflare DNS) and basic TLS are covered in Step 11.
 
 All console steps below assume the `feature/aws-integration` branch, which contains the app-side changes required for this to actually work (S3 client behavior, CORS, RDS SSL, production Docker images). Merge that branch before deploying.
 
@@ -215,12 +215,34 @@ You need at least one public ALB (for the frontend). Whether the backend gets it
 3. Try the sighting wizard's photo upload → confirms backend → S3 (via IAM role) works.
 4. Check ECS service logs (CloudWatch Logs, auto-created per task definition) if anything fails — the container-level health checks and application logs will point at the specific failure (RDS connection refused → security group issue; S3 access denied → IAM role/bucket policy issue; etc.).
 
+### Step 11 — Custom domain via Cloudflare
+
+You already have a domain on Cloudflare. **Use Cloudflare DNS pointed at the public ALB — not Cloudflare Tunnel.**
+
+Tunnel exists to expose a service that has no public ingress point of its own (e.g. a home server behind NAT/CGNAT with no port forwarding), by having a `cloudflared` process dial *out* to Cloudflare's edge. The public ALB from Step 9 is already a stable, public, directly-routable endpoint — there's nothing for a tunnel to solve here, and running `cloudflared` per ECS task would add real complexity (a sidecar container in every task, registering/deregistering as tasks scale or redeploy) for no benefit over a plain DNS record. Tunnel is the right call for the home server you mentioned earlier (where `syncspace_cloudflared_1` is already doing exactly this); it's the wrong tool for a Fargate + ALB setup that already has a public endpoint.
+
+**Simpler path (recommended for this pass — HTTPS at the edge, HTTP from Cloudflare to the ALB):**
+
+1. Cloudflare dashboard → your domain → **DNS** → **Add record**.
+2. Type **CNAME**, name e.g. `purrsona` (or `@` for the root domain), target = the public ALB's DNS name from Step 9 (looks like `purrsona-alb-public-xxxxxxxx.ap-southeast-1.elb.amazonaws.com`).
+3. Proxy status: **Proxied** (orange cloud). This terminates TLS at Cloudflare's edge — browsers get HTTPS immediately — while the connection from Cloudflare to your ALB stays plain HTTP on port 80. Cloudflare → **SSL/TLS** → set encryption mode to **Flexible** to match this (Cloudflare's other modes expect the origin itself to speak TLS, which the ALB isn't doing yet in this setup).
+4. Update the backend's `CORS_ALLOWED_ORIGINS` env var (Step 7.6) to your real domain, e.g. `https://purrsona.yourdomain.com`, and redeploy the backend service so browser requests from the real domain aren't blocked by CORS.
+5. Visit `https://purrsona.yourdomain.com` — should load over HTTPS.
+
+**More correct path (end-to-end TLS, do this later if you want it):**
+
+1. **ACM** (same region, ap-southeast-1) → **Request a certificate** → public certificate for your domain. Validation method: **DNS validation**.
+2. ACM will give you a CNAME record to prove domain ownership — add it in Cloudflare DNS (as **DNS only**, not proxied, so Cloudflare doesn't interfere with the validation request).
+3. Once the cert is **Issued**, go to the public ALB (Step 9) → **Listeners** → **Add listener** → HTTPS (443), select the ACM certificate → forward to `purrsona-tg-frontend`.
+4. Optionally add a listener rule on the existing HTTP (80) listener to redirect to HTTPS.
+5. Back in Cloudflare DNS, you can now set the proxy status and SSL/TLS mode to **Full** or **Full (strict)** instead of Flexible, since the ALB is genuinely terminating TLS now.
+
 ---
 
 ## 5. Known gaps in this pass (flagged, not addressed)
 
-- **No custom domain / TLS.** The public ALB is HTTP-only on its default AWS-generated DNS name. Add an ACM certificate + HTTPS listener + Route 53 record later if needed.
 - **No CI/CD.** Images are pushed manually per the Step 5 commands. Set up a pipeline (CodePipeline, GitHub Actions, etc.) later if you want automated deploys.
 - **Secrets are set as plain ECS environment variables**, not AWS Secrets Manager. Fine for a personal-scale deployment; revisit if this becomes multi-user or handles more sensitive data.
 - **Bucket public access decision (Step 3.3)** is a real tradeoff not resolved here — decide based on whether you want photo URLs directly browser-loadable or routed through the backend.
 - **Single-AZ RDS, single Fargate task per service** — no redundancy. Acceptable for personal-scale; revisit `Desired tasks` and RDS Multi-AZ if uptime matters more.
+- **End-to-end TLS (ALB ↔ Cloudflare) is optional, not done by default.** Step 11's simpler path only gets you HTTPS from the browser to Cloudflare; traffic from Cloudflare to the ALB is plain HTTP. Follow the "more correct path" in Step 11 if that gap matters to you.
