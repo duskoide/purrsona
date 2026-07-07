@@ -23,7 +23,8 @@ async def get_current_user(request: Request, db: asyncpg.Pool = Depends(get_db))
         return None
 
     row = await db.fetchrow(
-        "SELECT id, email, role, created_at, verified_at FROM users WHERE id = $1",
+        "SELECT id, email, role, created_at, verified_at, avatar_url "
+        "FROM users WHERE id = $1 AND deleted_at IS NULL",
         user_id,
     )
     if row is None:

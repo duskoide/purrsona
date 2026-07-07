@@ -6,6 +6,7 @@ export interface User {
   id: string;
   email: string;
   role: string;
+  avatar_url: string | null;
 }
 
 export function useAuth() {
@@ -67,5 +68,59 @@ export function useAuth() {
     setUser(null);
   };
 
-  return { user, isLoading, login, register, logout };
+  const updateEmail = async (email: string, currentPassword: string) => {
+    const res = await fetch("/api/v1/auth/me/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, current_password: currentPassword }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || "Failed to update email");
+    }
+    const updated = await res.json();
+    setUser(updated);
+  };
+
+  const uploadAvatar = async (file: File) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await fetch("/api/v1/auth/me/avatar", {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || "Failed to upload photo");
+    }
+    const updated = await res.json();
+    setUser(updated);
+  };
+
+  const deleteAccount = async (currentPassword: string) => {
+    const res = await fetch("/api/v1/auth/me", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ current_password: currentPassword }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || "Failed to delete account");
+    }
+    setUser(null);
+  };
+
+  return {
+    user,
+    isLoading,
+    login,
+    register,
+    logout,
+    updateEmail,
+    uploadAvatar,
+    deleteAccount,
+  };
 }
