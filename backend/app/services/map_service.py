@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import asyncpg
@@ -48,7 +49,7 @@ async def get_map_markers(
                     "longitude": float(row["lng"]),
                 },
                 "observed_at": row["observed_at"].isoformat(),
-                "condition_tags": row["condition_tags"],
+                "condition_tags": json.loads(row["condition_tags"]),
                 "cat": {
                     "id": str(row["cat_id"]),
                     "name": row["cat_name"] or "Unknown",
@@ -82,7 +83,7 @@ async def get_map_markers(
                     "latitude": float(row["lat"]),
                     "longitude": float(row["lng"]),
                 },
-                "details": row["details"],
+                "details": json.loads(row["details"]),
             }
         )
 
@@ -152,7 +153,7 @@ async def list_cats(
 
     cats = []
     for row in rows:
-        photos = row["photos"]
+        photos = json.loads(row["photos"])
         latest_photo = row["latest_sighting_photo"] or (photos[0] if photos else None)
         cats.append(
             {
@@ -226,7 +227,7 @@ async def get_cat_profile(
                     "longitude": float(row["lng"]),
                 },
                 "observed_at": row["observed_at"].isoformat(),
-                "condition_tags": row["condition_tags"],
+                "condition_tags": json.loads(row["condition_tags"]),
                 "photo_url": row["photo_url"],
                 "notes": row["notes"],
             }
@@ -246,7 +247,7 @@ async def get_cat_profile(
     return {
         "id": str(cat["id"]),
         "name": cat["name"],
-        "photos": cat["photos"],
+        "photos": json.loads(cat["photos"]),
         "tnr_status": cat["tnr_status"],
         "coat_color": cat["coat_color"],
         "pattern_type": cat["pattern_type"],

@@ -1,5 +1,5 @@
 import asyncpg  # type: ignore[import-untyped]
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 
 from app.core.error_handlers import error_response
 from app.core.rbac import require_role
@@ -23,8 +23,8 @@ router = APIRouter(prefix="/api/v1/matching", tags=["matching"])
 @router.post("/match")
 async def match_endpoint(
     image: UploadFile,
-    coat_color: str | None = None,
-    pattern_type: str | None = None,
+    coat_color: str | None = Form(None),
+    pattern_type: str | None = Form(None),
     user: User = Depends(require_role(UserRole.SIGNED_IN)),
     db: asyncpg.Pool = Depends(get_db),
 ) -> dict[str, object]:

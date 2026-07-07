@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -85,7 +86,7 @@ async def initiate_sighting(
         blurred_lng,
         blurred_lat,
         datetime.fromisoformat(observed_at),
-        condition_tags,
+        json.dumps(condition_tags),
         coat_color,
         pattern_type,
         notable_markings,
@@ -93,7 +94,7 @@ async def initiate_sighting(
         body_size,
         notes,
         f"[{','.join(str(x) for x in embedding)}]",
-        candidates,
+        json.dumps(candidates),
     )
 
     return {
