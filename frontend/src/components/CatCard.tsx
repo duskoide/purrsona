@@ -13,15 +13,6 @@ interface CatCardProps {
   latestPhoto: string | null;
 }
 
-const TNR_STATUS_MAP: Record<string, "verified" | "signed_in" | "pending"> = {
-  completed: "verified",
-  ear_tipped: "verified",
-  needs_tnr: "pending",
-  scheduled: "pending",
-  in_progress: "pending",
-  unassessed: "signed_in",
-};
-
 export function CatCard({ id, name, tnrStatus, coatColor, patternType, latestPhoto }: CatCardProps) {
   return (
     <Link href={`/cats/${id}`}>
@@ -41,7 +32,7 @@ export function CatCard({ id, name, tnrStatus, coatColor, patternType, latestPho
           <div className="flex flex-col gap-2 p-2">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold">{name}</h3>
-              <StatusBadge status={TNR_STATUS_MAP[tnrStatus] || "signed_in"} />
+              <StatusBadge status={tnrStatus} />
             </div>
             <p className="text-neutral-600">
               {coatColor} {patternType}

@@ -39,15 +39,6 @@ interface CatProfile {
   }>;
 }
 
-const TNR_STATUS_MAP: Record<string, "verified" | "signed_in" | "pending"> = {
-  completed: "verified",
-  ear_tipped: "verified",
-  needs_tnr: "pending",
-  scheduled: "pending",
-  in_progress: "pending",
-  unassessed: "signed_in",
-};
-
 export default function CatProfilePage() {
   const params = useParams();
   const catId = params.cat_id as string;
@@ -118,7 +109,7 @@ export default function CatProfilePage() {
         <div className="lg:w-2/3">
           <div className="flex items-center gap-4 mb-4">
             <h1 className="text-3xl font-bold">{cat.name || "Unknown"}</h1>
-            <StatusBadge status={TNR_STATUS_MAP[cat.tnr_status] || "signed_in"} />
+            <StatusBadge status={cat.tnr_status} />
             {user && (
               <Link href={`/cats/${catId}/edit`}>
                 <Button variant="secondary" size="sm">Edit</Button>

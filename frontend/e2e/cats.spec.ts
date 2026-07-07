@@ -42,6 +42,30 @@ test.describe("Cats list + profile detail", () => {
     await expect(page.getByRole("heading", { name: "TNR Records" })).toBeVisible();
   });
 
+  test("cat status badges show TNR status, not user account status", async ({ page }) => {
+    await page.goto("/cats");
+    await expect(page.getByRole("heading", { name: "COMMUNITY CATS" })).toBeVisible();
+
+    // Seed cats cover every TNR state; badges must use TNR vocabulary
+    // (e.g. "TNR COMPLETED", "NEEDS TNR") rather than account-role labels
+    // like "VERIFIED" or "SIGNED IN", which mean something unrelated.
+    const badges = page.locator('[role="status"]');
+    await expect(badges.first()).toBeVisible();
+    const badgeTexts = await badges.allInnerTexts();
+
+    expect(badgeTexts.length).toBeGreaterThan(0);
+    for (const text of badgeTexts) {
+      expect(text).not.toBe("VERIFIED");
+      expect(text).not.toBe("SIGNED IN");
+      expect(text).not.toBe("PUBLIC");
+    }
+
+    // Whiskers is seeded with tnr_status "completed".
+    await page.getByText("Whiskers").first().click();
+    await page.waitForURL(/\/cats\/[0-9a-f-]+$/);
+    await expect(page.locator('[role="status"]').first()).toHaveText("TNR COMPLETED");
+  });
+
   test("cat profile shows Edit button only when logged in", async ({ page }) => {
     await page.goto("/cats");
     await page.getByText("Whiskers").first().click();
