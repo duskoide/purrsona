@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </p>
             <button
               onClick={this.handleReload}
-              className="px-6 py-2 bg-primary-500 text-white border-2 border-neutral-900 rounded-full shadow-[3px_3px_0_#272220] hover:shadow-[1px_1px_0_#272220] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[3px] active:translate-y-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none"
+              className="px-6 py-2 bg-primary-500 text-white border-2 border-neutral-900 rounded-full shadow-[3px_3px_0_#272220] hover:shadow-[4px_4px_0_#272220] hover:-translate-x-0.5 hover:-translate-y-0.5 active:shadow-[1px_1px_0_#272220] active:translate-x-0.5 active:translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 motion-reduce:transition-none"
             >
               Reload Page
             </button>
