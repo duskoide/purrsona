@@ -28,6 +28,7 @@ async def initiate_sighting(
     ear_tip_status: bool | None,
     body_size: str | None,
     notes: str | None,
+    reporter_contact: str | None = None,
 ) -> dict[str, Any]:
     """Create a sighting draft and find cat matches.
 
@@ -66,7 +67,7 @@ async def initiate_sighting(
             location, blurred_location,
             observed_at, condition_tags,
             coat_color, pattern_type, notable_markings,
-            ear_tip_status, body_size, notes,
+            ear_tip_status, body_size, notes, reporter_contact,
             embedding, match_candidates
         ) VALUES (
             $1, $2, $3,
@@ -74,8 +75,8 @@ async def initiate_sighting(
             ST_SetSRID(ST_MakePoint($6, $7), 4326),
             $8, $9::jsonb,
             $10, $11, $12,
-            $13, $14, $15,
-            $16::vector, $17::jsonb
+            $13, $14, $15, $16,
+            $17::vector, $18::jsonb
         )
         """,
         draft_id,
@@ -93,6 +94,7 @@ async def initiate_sighting(
         ear_tip_status,
         body_size,
         notes,
+        reporter_contact,
         f"[{','.join(str(x) for x in embedding)}]",
         json.dumps(candidates),
     )
@@ -160,13 +162,13 @@ async def confirm_sighting(
                 location, blurred_location,
                 observed_at, condition_tags,
                 coat_color, pattern_type, notable_markings,
-                ear_tip_status, body_size, notes
+                ear_tip_status, body_size, notes, reporter_contact
             ) VALUES (
                 $1, $2, $3, $4,
                 $5, $6,
                 $7, $8::jsonb,
                 $9, $10, $11,
-                $12, $13, $14
+                $12, $13, $14, $15
             )
             """,
             sighting_id,
@@ -183,6 +185,7 @@ async def confirm_sighting(
             draft["ear_tip_status"],
             draft["body_size"],
             draft["notes"],
+            draft["reporter_contact"],
         )
 
         await conn.execute("DELETE FROM sighting_drafts WHERE id = $1", draft_id)

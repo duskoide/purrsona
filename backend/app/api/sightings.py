@@ -41,6 +41,7 @@ async def initiate_endpoint(
     ear_tip_status: bool | None = Form(None),
     body_size: str | None = Form(None),
     notes: str | None = Form(None),
+    reporter_contact: str | None = Form(None),
     user: User = Depends(require_role(UserRole.SIGNED_IN)),
     db: asyncpg.Pool = Depends(get_db),
 ) -> dict[str, Any]:
@@ -60,6 +61,10 @@ async def initiate_endpoint(
         valid = ", ".join(sorted(VALID_BODY_SIZES))
         param_errors.append(
             {"field": "body_size", "message": f"Invalid value. Must be one of: {valid}"}
+        )
+    if reporter_contact is not None and len(reporter_contact) > 255:
+        param_errors.append(
+            {"field": "reporter_contact", "message": "Must be 255 characters or fewer"}
         )
     try:
         datetime.fromisoformat(observed_at)
@@ -113,6 +118,7 @@ async def initiate_endpoint(
         ear_tip_status=ear_tip_status,
         body_size=body_size,
         notes=notes,
+        reporter_contact=reporter_contact,
     )
 
 
