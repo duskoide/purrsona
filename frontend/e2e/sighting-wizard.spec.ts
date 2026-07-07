@@ -18,7 +18,7 @@ test.describe("Sighting submission wizard", () => {
     await expect(page.getByRole("heading", { name: "Upload Photo" })).toBeVisible();
 
     // "Next" should be disabled until an image is selected.
-    const nextButton = page.getByRole("button", { name: "Next" });
+    const nextButton = page.getByRole("button", { name: "Next", exact: true });
     await expect(nextButton).toBeDisabled();
 
     await page.locator('input[type="file"]').setInputFiles(FIXTURE_IMAGE);
@@ -34,10 +34,10 @@ test.describe("Sighting submission wizard", () => {
     await page.goto("/sightings/new");
 
     await page.locator('input[type="file"]').setInputFiles(FIXTURE_IMAGE);
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Pick Location" })).toBeVisible();
 
-    const nextButton = page.getByRole("button", { name: "Next" });
+    const nextButton = page.getByRole("button", { name: "Next", exact: true });
     await expect(nextButton).toBeDisabled();
 
     // Click the center of the Leaflet map to select a location.
@@ -60,7 +60,7 @@ test.describe("Sighting submission wizard", () => {
 
     // Step 1: photo
     await page.locator('input[type="file"]').setInputFiles(FIXTURE_IMAGE);
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
 
     // Step 2: location
     await expect(page.getByRole("heading", { name: "Pick Location" })).toBeVisible();
@@ -69,7 +69,7 @@ test.describe("Sighting submission wizard", () => {
     const box = await mapEl.boundingBox();
     if (!box) throw new Error("Map container has no bounding box");
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
 
     // Step 3: cat description
     await expect(page.getByRole("heading", { name: "Cat Description" })).toBeVisible();
@@ -114,7 +114,7 @@ test.describe("Sighting submission wizard", () => {
     await page.goto("/sightings/new");
 
     await page.locator('input[type="file"]').setInputFiles(FIXTURE_IMAGE);
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Pick Location" })).toBeVisible();
 
     await page.getByRole("button", { name: "Back" }).click();
