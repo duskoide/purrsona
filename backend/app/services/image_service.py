@@ -34,14 +34,20 @@ _s3_client = None
 def _get_s3():
     global _s3_client
     if _s3_client is None:
-        _s3_client = boto3.client(
-            "s3",
-            endpoint_url=settings.S3_ENDPOINT,
-            aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY,
-            config=Config(signature_version="s3v4"),
-            region_name="us-east-1",
-        )
+        client_kwargs: dict = {
+            "config": Config(signature_version="s3v4"),
+            "region_name": settings.S3_REGION,
+        }
+        # Local dev (MinIO) needs a custom endpoint and static credentials.
+        # Real AWS S3 needs neither: boto3 resolves the endpoint from the
+        # region, and credentials come from the ECS task's IAM role.
+        if settings.S3_ENDPOINT:
+            client_kwargs["endpoint_url"] = settings.S3_ENDPOINT
+        if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY:
+            client_kwargs["aws_access_key_id"] = settings.S3_ACCESS_KEY
+            client_kwargs["aws_secret_access_key"] = settings.S3_SECRET_KEY
+
+        _s3_client = boto3.client("s3", **client_kwargs)
     return _s3_client
 
 
@@ -104,4 +110,4 @@ async def upload_image(file: UploadFile) -> str:
         ContentType=fmt.value,
     )
 
-    return f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET}/{key}"
+    return f"{settings.s3_public_base_url}/{key}"
