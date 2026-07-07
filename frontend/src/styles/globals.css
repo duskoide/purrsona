@@ -44,6 +44,101 @@
 
   .pixel-spinner-dot:nth-child(2) { animation-delay: 0.15s; }
   .pixel-spinner-dot:nth-child(3) { animation-delay: 0.3s; }
+
+  /* Map markers — 0px corners on the icon itself (per design system),
+     hard 2px outline instead of a soft drop shadow, and an emoji glyph
+     so meaning never depends on color alone. */
+  .purrsona-marker-cat,
+  .purrsona-marker-feeding {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    border: 2px solid #272220;
+    box-shadow: 2px 2px 0 #272220;
+  }
+
+  .purrsona-marker-feeding {
+    background: #ef8c38;
+  }
+
+  .purrsona-popup .leaflet-popup-content-wrapper {
+    border: 2px solid #272220;
+    border-radius: 0;
+    box-shadow: 4px 4px 0 #272220;
+  }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: 0 !important;
+  }
+
+  .leaflet-popup-tip {
+    border-radius: 0 !important;
+  }
+
+  .purrsona-popup-title {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+
+  .purrsona-popup-line {
+    font-size: 0.85rem;
+    margin-bottom: 2px;
+  }
+
+  .purrsona-popup-link {
+    display: inline-block;
+    margin-top: 6px;
+    font-weight: 700;
+    text-decoration: underline;
+    color: #e8731a;
+  }
+
+  /* Map legend — text label on every row, never color-only. */
+  .purrsona-legend {
+    background: #fffbf5;
+    border: 2px solid #272220;
+    box-shadow: 4px 4px 0 #272220;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+
+  .purrsona-legend-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: 0.05em;
+  }
+
+  .purrsona-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .purrsona-legend-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .purrsona-legend-swatch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #272220;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .purrsona-legend-swatch-feeding {
+    background: #ef8c38;
+  }
 }
 
 @layer utilities {

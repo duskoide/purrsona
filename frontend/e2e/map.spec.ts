@@ -40,4 +40,41 @@ test.describe("Map page", () => {
     await page.waitForURL("**/map");
     await expect(page.locator(".leaflet-container")).toBeVisible({ timeout: 15000 });
   });
+
+  test("map renders cat and feeding spot markers with a legend", async ({ page }) => {
+    await page.goto("/map");
+    await expect(page.locator(".leaflet-container")).toBeVisible({ timeout: 15000 });
+
+    // Seed data has 2 sightings (Whiskers, Shadow) and 1 feeding spot
+    // clustered near NYC — the map should auto-fit to that cluster and
+    // render a marker for each, not leave the viewport empty.
+    await expect(page.locator(".purrsona-marker-cat")).toHaveCount(2, { timeout: 15000 });
+    await expect(page.locator(".purrsona-marker-feeding")).toHaveCount(1, { timeout: 15000 });
+
+    // Legend must be visible and spell out status in text (no color-only
+    // indicators per the design system).
+    const legend = page.locator(".purrsona-legend");
+    await expect(legend).toBeVisible();
+    await expect(legend.getByText("Cat — TNR done")).toBeVisible();
+    await expect(legend.getByText("Feeding spot")).toBeVisible();
+  });
+
+  test("clicking a cat marker opens a popup with name and TNR status", async ({ page }) => {
+    await page.goto("/map");
+    await expect(page.locator(".leaflet-container")).toBeVisible({ timeout: 15000 });
+    const marker = page.locator(".purrsona-marker-cat").first();
+    await expect(marker).toBeVisible({ timeout: 15000 });
+
+    // Leaflet's marker DOM has overlapping absolutely-positioned siblings
+    // that can intercept Playwright's element-based click; clicking by
+    // coordinates (like a real user tap) is more reliable here.
+    const box = await marker.boundingBox();
+    if (!box) throw new Error("Cat marker has no bounding box");
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+    const popup = page.locator(".leaflet-popup-content");
+    await expect(popup).toBeVisible();
+    await expect(popup.getByText("TNR status:")).toBeVisible();
+    await expect(popup.getByRole("link", { name: "View cat profile" })).toBeVisible();
+  });
 });
